@@ -23,8 +23,11 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		return fmt.Errorf("CLI flags error: %w", err)
 	}
 
-	logger := logging.New(stdOut, stdErr, cfg.Verbosity)
+	logger := logging.New(stdOut, stdErr, logging.LevelFromVerbosity(cfg.Verbosity))
 	defer logger.Flush()
+
+	logger.Debug("version", version)
+	logger.Debug("skip", fmt.Sprintf("%v", cfg.SkipPatterns))
 
 	opts := processor.Options{
 		Skip:         cfg.SkipPatterns,

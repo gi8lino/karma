@@ -1,6 +1,8 @@
 package cli
 
-import "github.com/containeroo/tinyflags"
+import (
+	"github.com/containeroo/tinyflags"
+)
 
 // Config holds parsed command-line options.
 type Config struct {
@@ -16,8 +18,8 @@ type Config struct {
 // Parse builds user configuration from CLI args.
 func Parse(version string, args []string) (Config, error) {
 	fs := tinyflags.NewFlagSet("kustomizer", tinyflags.ContinueOnError)
-	fs.RequirePositional(1)
 	fs.Version(version)
+	fs.RequirePositional(1)
 
 	cfg := Config{}
 
@@ -42,7 +44,7 @@ func Parse(version string, args []string) (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.BaseDirs = cfg.BaseDirs
+	cfg.BaseDirs = fs.Args()
 
 	return cfg, nil
 }

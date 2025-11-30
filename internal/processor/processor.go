@@ -48,18 +48,28 @@ func (p *Processor) Process(ctx context.Context, dir string) (updated, noOp int,
 
 // Walk kicks off a recursive traversal rooted at dir.
 func (p *Processor) Walk(ctx context.Context, dir string) (updated, noOp int, err error) {
-	matcher, err := gitignore.Load(dir, p.opts.UseGitIgnore)
-	if err != nil {
-		return 0, 0, err
-	}
-	return p.walkDir(ctx, dir, dir, matcher)
+	return p.walkDir(ctx, dir, dir, nil)
 }
 
 // walkDir processes the current directory and recurses into children.
-func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitignore.Matcher) (updated, noOp int, err error) {
-	dirEntries := make([]string, 0, 16)
-	fileEntries := make([]string, 0, 16)
-	subdirs := make([]string, 0, 16)
+func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitignore.Matcher) (updated, noOp int, err error) {
+	var matcher gitignore.Matcher
+	if p.opts.UseGitIgnore {
+		if parent != nil {
+			matcher, err = parent.Child(dir)
+		} else {
+			matcher, err = gitignore.Load(dir, true)
+		}
+		if err != nil {
+			return 0, 0, fmt.Errorf("load .gitignore for %s: %w", dir, err)
+		}
+	} else {
+		matcher = nil
+	}
+
+	var dirEntries []string
+	var fileEntries []string
+	var subdirs []string
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -67,9 +77,10 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 	}
 
 	for _, entry := range entries {
-		if entry.Name() == "kustomization.yaml" || entry.Name() == "kustomization.yml" {
+		if isKustomization(entry.Name()) {
 			continue
 		}
+
 		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
@@ -86,14 +97,11 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 			continue
 		}
 
-		skip, subtree, pattern := p.matchSkip(rel, entry.IsDir())
+		skip, subtree, pattern := p.matchSkip(rel)
 		if skip {
 			p.logger.Skipped("path", rel, "reason", pattern)
-			if entry.IsDir() {
-				if !subtree {
-					subdirs = append(subdirs, entry.Name())
-				}
-				continue
+			if entry.IsDir() && !subtree {
+				subdirs = append(subdirs, entry.Name())
 			}
 			continue
 		}
@@ -126,14 +134,7 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 	}
 
 	for _, sub := range subdirs {
-		childMatcher := matcher
-		if matcher != nil {
-			childMatcher, err = matcher.Child(filepath.Join(dir, sub))
-			if err != nil {
-				return updated, noOp, err
-			}
-		}
-		u, n, err := p.walkDir(ctx, filepath.Join(dir, sub), base, childMatcher)
+		u, n, err := p.walkDir(ctx, filepath.Join(dir, sub), base, matcher)
 		if err != nil {
 			return updated, noOp, err
 		}
@@ -145,7 +146,7 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 }
 
 // matchSkip decides if a path should be skipped based on configured rules.
-func (p *Processor) matchSkip(rel string, isDir bool) (skip, subtree bool, pattern string) {
+func (p *Processor) matchSkip(rel string) (skip, subtree bool, pattern string) {
 	for _, rule := range p.skipRules {
 		switch rule.mode {
 		case skipModeSubtree:
@@ -160,14 +161,25 @@ func (p *Processor) matchSkip(rel string, isDir bool) (skip, subtree bool, patte
 			if rel == rule.value {
 				return true, true, rule.raw
 			}
-		case skipModeGlob:
-			matched, err := path.Match(rule.value, rel)
-			if err == nil && matched {
+			if !strings.Contains(rule.value, "/") && path.Base(rel) == rule.value {
 				return true, true, rule.raw
+			}
+		case skipModeGlob:
+			if matched, err := path.Match(rule.value, rel); err == nil && matched {
+				return true, true, rule.raw
+			}
+			if !strings.Contains(rule.value, "/") {
+				if matched, err := path.Match(rule.value, path.Base(rel)); err == nil && matched {
+					return true, true, rule.raw
+				}
 			}
 		}
 	}
 	return false, false, ""
+}
+
+func isKustomization(name string) bool {
+	return name == "kustomization.yaml" || name == "kustomization.yml"
 }
 
 type skipMode int
@@ -259,6 +271,10 @@ func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fi
 	final := p.mergeResources(order, dirEntries, fileEntries)
 	if equalStrings(final, order) {
 		return false, nil
+	}
+
+	if p.logger != nil {
+		p.logger.ResourceDiff(order, final)
 	}
 
 	content := make([]*yaml.Node, 0, len(final))

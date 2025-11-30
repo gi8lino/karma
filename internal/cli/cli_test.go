@@ -10,7 +10,7 @@ import (
 func TestParse(t *testing.T) {
 	t.Parallel()
 
-	cfg, err := Parse([]string{
+	cfg, err := Parse("1.0.0", []string{
 		"-s", ".img,dashboards",
 		"-s", "patch-*",
 		"-v",

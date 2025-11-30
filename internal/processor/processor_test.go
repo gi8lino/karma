@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/containeroo/kustomizer/internal/logging"
+	"github.com/gi8lino/kustomizer/internal/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
