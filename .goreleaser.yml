@@ -1,0 +1,20 @@
+---
+project_name: kustomizer
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/kustomizer/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    ldflags:
+      - -s -w
+      - -X main.Version={{ .Tag }}
+      - -X main.Commit={{ .FullCommit }}

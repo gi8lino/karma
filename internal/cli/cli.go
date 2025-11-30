@@ -1,0 +1,48 @@
+package cli
+
+import "github.com/containeroo/tinyflags"
+
+// Config holds parsed command-line options.
+type Config struct {
+	BaseDirs     []string
+	SkipPatterns []string
+	Verbosity    int
+	NoDirSlash   bool
+	NoDirFirst   bool
+	NoGitIgnore  bool
+	IncludeDot   bool
+}
+
+// Parse builds user configuration from CLI args.
+func Parse(version string, args []string) (Config, error) {
+	fs := tinyflags.NewFlagSet("kustomizer", tinyflags.ContinueOnError)
+	fs.RequirePositional(1)
+	fs.Version(version)
+
+	cfg := Config{}
+
+	fs.StringSliceVar(&cfg.SkipPatterns, "skip", []string{}, "Skip resources (comma-separated).").
+		Short("s").
+		Value()
+	fs.CounterVar(&cfg.Verbosity, "verbose", 0, "Increase verbosity.").
+		Short("v").
+		Value()
+	fs.BoolVar(&cfg.NoGitIgnore, "no-gitignore", false, "Disable .gitignore processing.").
+		Value()
+	fs.BoolVar(&cfg.IncludeDot, "include-dot", false, "Include hidden files and directories.").
+		Value()
+
+	fs.BoolVar(&cfg.NoDirSlash, "no-dir-slash", false, "Disable trailing slash for directory resources.").
+		Value()
+
+	fs.BoolVar(&cfg.NoDirFirst, "no-dir-first", false, "Disable directory-first sorting.").
+		Value()
+
+	if err := fs.Parse(args); err != nil {
+		return Config{}, err
+	}
+
+	cfg.BaseDirs = cfg.BaseDirs
+
+	return cfg, nil
+}
