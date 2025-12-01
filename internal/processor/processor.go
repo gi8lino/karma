@@ -1,11 +1,11 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -43,98 +43,43 @@ func New(opts Options, logger *logging.Logger) *Processor {
 
 // Process walks a directory tree and updates kustomizations incrementally.
 func (p *Processor) Process(ctx context.Context, dir string) (updated, noOp int, err error) {
-	return p.Walk(ctx, dir)
-}
-
-// Walk kicks off a recursive traversal rooted at dir.
-func (p *Processor) Walk(ctx context.Context, dir string) (updated, noOp int, err error) {
-	return p.walkDir(ctx, dir, dir, nil)
+	return p.walkDir(ctx, dir, dir, nil, false)
 }
 
 // walkDir processes the current directory and recurses into children.
-func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitignore.Matcher) (updated, noOp int, err error) {
-	var matcher gitignore.Matcher
-	if p.opts.UseGitIgnore {
-		if parent != nil {
-			matcher, err = parent.Child(dir)
-		} else {
-			matcher, err = gitignore.Load(dir, true)
-		}
-		if err != nil {
-			return 0, 0, fmt.Errorf("load .gitignore for %s: %w", dir, err)
-		}
-	} else {
-		matcher = nil
-	}
-
-	var dirEntries []string
-	var fileEntries []string
-	var subdirs []string
-
-	entries, err := os.ReadDir(dir)
+func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitignore.Matcher, skipUpdate bool) (updated, noOp int, err error) {
+	// Load the matcher once so we can reuse it for each directory.
+	matcher, err := p.loadMatcher(dir, parent)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	for _, entry := range entries {
-		if isKustomization(entry.Name()) {
-			continue
-		}
-
-		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-
-		fullPath := filepath.Join(dir, entry.Name())
-		rel, relErr := filepath.Rel(base, fullPath)
-		if relErr != nil || rel == "." {
-			rel = entry.Name()
-		}
-		rel = filepath.ToSlash(rel)
-
-		if matcher != nil && matcher.Ignored(fullPath, entry.IsDir()) {
-			p.logger.Skipped("path", rel, "reason", "gitignore")
-			continue
-		}
-
-		skip, subtree, pattern := p.matchSkip(rel)
-		if skip {
-			p.logger.Skipped("path", rel, "reason", pattern)
-			if entry.IsDir() && !subtree {
-				subdirs = append(subdirs, entry.Name())
-			}
-			continue
-		}
-
-		if entry.IsDir() {
-			dirEntries = append(dirEntries, entry.Name())
-			subdirs = append(subdirs, entry.Name())
-			continue
-		}
-		if isYAML(entry.Name()) {
-			fileEntries = append(fileEntries, entry.Name())
-		}
+	// Load the entries once so scanEntries can handle ignores and skip logic.
+	dirEntries, fileEntries, subdirs, err := p.scanEntries(dir, base, matcher)
+	if err != nil {
+		return 0, 0, err
 	}
 
+	// Resolve which kustomization file we should touch (yaml or yml).
 	kustomizationPath, exists, pathErr := p.pickKustomizationPath(dir)
 	if pathErr != nil {
 		return 0, 0, pathErr
 	}
 
-	updatedDir, err := p.updateKustomization(kustomizationPath, exists, dirEntries, fileEntries)
+	// Rewrite the kustomization file if it changed.
+	u, n, err := p.applyKustomization(dir, kustomizationPath, exists, dirEntries, fileEntries, skipUpdate)
 	if err != nil {
 		return 0, 0, err
 	}
-	if updatedDir {
-		updated++
-		p.logger.Updated(kustomizationPath)
-	} else {
-		noOp++
-		p.logger.NoOp(kustomizationPath)
-	}
+	updated += u
+	noOp += n
 
-	for _, sub := range subdirs {
-		u, n, err := p.walkDir(ctx, filepath.Join(dir, sub), base, matcher)
+	// Recurse into each child unless marked as "skipWalk".
+	for _, child := range subdirs {
+		if child.skipWalk {
+			continue
+		}
+		u, n, err := p.walkDir(ctx, filepath.Join(dir, child.name), base, matcher, child.skipUpdate)
 		if err != nil {
 			return updated, noOp, err
 		}
@@ -145,107 +90,96 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitign
 	return updated, noOp, nil
 }
 
-// matchSkip decides if a path should be skipped based on configured rules.
-func (p *Processor) matchSkip(rel string) (skip, subtree bool, pattern string) {
-	for _, rule := range p.skipRules {
-		switch rule.mode {
-		case skipModeSubtree:
-			if matchesPrefix(rel, rule.value) {
-				return true, true, rule.raw
+// scanEntries returns the directories, YAML files, and recursion hints for dir.
+// The return tuples are:
+//
+//	dirEntries: resource directories that belong in this kustomization,
+//	fileEntries: YAML files within dir that belong in this kustomization,
+//	childDirs: metadata that controls how each subdirectory is traversed.
+func (p *Processor) scanEntries(
+	dir, base string,
+	matcher gitignore.Matcher,
+) (dirEntries []string, fileEntries []string, childDirs []childDir, err error) {
+	// Get all items in the directory.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Walk entries so ignores and skip patterns are applied deterministically.
+	for _, entry := range entries {
+		if isKustomization(entry.Name()) {
+			continue
+		}
+
+		// skip hidden entries when configured to ignore dotfiles.
+		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		// compute the relative path for logging.
+		fullPath := filepath.Join(dir, entry.Name())
+		rel := p.relPath(base, fullPath)
+
+		// Check .gitignore before skip patterns.
+		if matcher != nil && matcher.Ignored(fullPath, entry.IsDir()) {
+			p.logger.Skipped("path", rel, "reason", "gitignore")
+			continue
+		}
+
+		// ask the skip matcher whether this resource should be withheld.
+		skip, mode, pattern := matchSkip(rel, entry.IsDir(), p.skipRules)
+		if skip {
+			p.logger.Skipped("path", rel, "reason", pattern)
+			if !entry.IsDir() {
+				continue
 			}
-		case skipModeChildren:
-			if matchesChild(rel, rule.value) {
-				return true, false, rule.raw
-			}
-		case skipModeExact:
-			if rel == rule.value {
-				return true, true, rule.raw
-			}
-			if !strings.Contains(rule.value, "/") && path.Base(rel) == rule.value {
-				return true, true, rule.raw
-			}
-		case skipModeGlob:
-			if matched, err := path.Match(rule.value, rel); err == nil && matched {
-				return true, true, rule.raw
-			}
-			if !strings.Contains(rule.value, "/") {
-				if matched, err := path.Match(rule.value, path.Base(rel)); err == nil && matched {
-					return true, true, rule.raw
-				}
-			}
+			// directories may remain listed but we adjust recursion based on skip mode
+			dirEntries, childDirs = handleSkipDir(entry, mode, dirEntries, childDirs)
+			continue
+		}
+
+		// record directories and schedule recursive processing.
+		if entry.IsDir() {
+			dirEntries = append(dirEntries, entry.Name())
+			childDirs = append(childDirs, childDir{name: entry.Name()})
+			continue
+		}
+
+		// include eligible YAML files in the resource list.
+		if isYAML(entry.Name()) {
+			fileEntries = append(fileEntries, entry.Name())
 		}
 	}
-	return false, false, ""
+
+	return dirEntries, fileEntries, childDirs, nil
 }
 
-func isKustomization(name string) bool {
-	return name == "kustomization.yaml" || name == "kustomization.yml"
+// loadMatcher returns the matcher for dir using the parent stack.
+func (p *Processor) loadMatcher(dir string, parent gitignore.Matcher) (gitignore.Matcher, error) {
+	if !p.opts.UseGitIgnore {
+		return nil, nil
+	}
+	if parent != nil {
+		return parent.Child(dir)
+	}
+	return gitignore.Load(dir, true)
 }
 
-type skipMode int
-
-const (
-	skipModeExact skipMode = iota
-	skipModeGlob
-	skipModeSubtree
-	skipModeChildren
-)
-
-type skipRule struct {
-	raw   string
-	mode  skipMode
-	value string
-}
-
-// parseSkipRules builds skip rules from configured patterns.
-func parseSkipRules(patterns []string) []skipRule {
-	rules := make([]skipRule, 0, len(patterns))
-	for _, raw := range patterns {
-		rule := skipRule{raw: raw}
-		switch {
-		case strings.HasSuffix(raw, "/**"):
-			rule.mode = skipModeSubtree
-			rule.value = strings.TrimSuffix(raw, "/**")
-		case strings.HasSuffix(raw, "/*"):
-			rule.mode = skipModeChildren
-			rule.value = strings.TrimSuffix(raw, "/*")
-		case strings.ContainsAny(raw, "*?[]"):
-			rule.mode = skipModeGlob
-			rule.value = raw
-		default:
-			rule.mode = skipModeExact
-			rule.value = raw
-		}
-		rules = append(rules, rule)
+// relPath computes a clean slash-separated relative path for logging.
+func (p *Processor) relPath(base, full string) string {
+	rel, err := filepath.Rel(base, full)
+	if err != nil || rel == "." {
+		return filepath.Base(full)
 	}
-	return rules
-}
-
-func matchesPrefix(rel, prefix string) bool {
-	if prefix == "" {
-		return true
-	}
-	if rel == prefix {
-		return true
-	}
-	return strings.HasPrefix(rel, prefix+"/")
-}
-
-func matchesChild(rel, prefix string) bool {
-	if prefix == "" {
-		return !strings.Contains(rel, "/")
-	}
-	if !strings.HasPrefix(rel, prefix+"/") {
-		return false
-	}
-	rest := rel[len(prefix)+1:]
-	return rest != "" && !strings.Contains(rest, "/")
+	return filepath.ToSlash(rel)
 }
 
 // pickKustomizationPath finds an existing file or defaults to yaml.
 func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 	candidates := []string{"kustomization.yaml", "kustomization.yml"}
 	for _, name := range candidates {
+		// probe the candidate path to see if the file exists.
 		full := filepath.Join(dir, name)
 		info, err := os.Stat(full)
 		if err == nil {
@@ -254,31 +188,37 @@ func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 			}
 			return full, true, nil
 		}
+
+		// propagate unexpected errors rather than treating them as missing.
 		if !errors.Is(err, os.ErrNotExist) {
 			return "", false, err
 		}
 	}
+	// If we didn't find a kustomization, create one.
 	return filepath.Join(dir, "kustomization.yaml"), false, nil
 }
 
 // updateKustomization rewrites the resources section if it changed.
 func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fileEntries []string) (bool, error) {
+	// load or initialize the target YAML document.
 	root, seq, order, nodes, err := p.loadKustomization(path, exists)
 	if err != nil {
 		return false, err
 	}
 
+	// build the canonical resource order.
 	final := p.mergeResources(order, dirEntries, fileEntries)
 	if equalStrings(final, order) {
 		return false, nil
 	}
 
-	if p.logger != nil {
-		p.logger.ResourceDiff(order, final)
-	}
+	// show the diff before rewriting.
+	p.logger.ResourceDiff(order, final)
 
+	// build scalar nodes for each entry.
 	content := make([]*yaml.Node, 0, len(final))
 	for _, val := range final {
+		// reuse existing nodes whenever possible.
 		if node, ok := nodes[val]; ok {
 			content = append(content, node)
 			continue
@@ -289,27 +229,67 @@ func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fi
 			Tag:   "!!str",
 		})
 	}
-
 	seq.Content = content
 
-	file, err := os.Create(path)
-	if err != nil {
-		return false, fmt.Errorf("create %s: %w", path, err)
-	}
-	defer file.Close()
-
-	enc := yaml.NewEncoder(file)
+	// encode through a buffer so we can add the document marker.
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err := enc.Encode(root); err != nil {
 		return false, fmt.Errorf("encode: %w", err)
 	}
+	if err := enc.Close(); err != nil {
+		return false, fmt.Errorf("close encoder: %w", err)
+	}
+
+	// create or truncate the target file before writing the encoded YAML.
+	file, err := os.Create(path)
+	if err != nil {
+		return false, fmt.Errorf("create %s: %w", path, err)
+	}
+	defer file.Close() // nolint:errcheck
+
+	// always prepend the canonical document start.
+	if _, err := file.WriteString("---\n"); err != nil {
+		return false, fmt.Errorf("write prefix: %w", err)
+	}
+
+	// write the encoded document after the header.
+	if _, err := file.Write(buf.Bytes()); err != nil {
+		return false, fmt.Errorf("write content: %w", err)
+	}
+
 	return true, nil
+}
+
+// applyKustomization decides whether to rewrite a kustomization based on skip flags.
+func (p *Processor) applyKustomization(dir, path string, exists bool, dirEntries, fileEntries []string, skipUpdate bool) (updated, noOp int, err error) {
+	if skipUpdate {
+		p.logger.Trace("skip-update", "dir", dir)
+		return 0, 0, nil
+	}
+
+	// rewrite the file unless skipUpdate was requested.
+	updatedDir, err := p.updateKustomization(path, exists, dirEntries, fileEntries)
+	if err != nil {
+		return 0, 0, err
+	}
+	// log whether we updated anything.
+	if updatedDir {
+		p.logger.Updated(path)
+		return 1, 0, nil
+	}
+
+	p.logger.NoOp(path)
+
+	return 0, 1, nil
 }
 
 // loadKustomization reads or initializes the YAML document.
 func (p *Processor) loadKustomization(path string, exists bool) (*yaml.Node, *yaml.Node, []string, map[string]*yaml.Node, error) {
 	root := &yaml.Node{}
 	if exists {
+		// read the existing node tree to preserve comments.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -318,17 +298,24 @@ func (p *Processor) loadKustomization(path string, exists bool) (*yaml.Node, *ya
 			return nil, nil, nil, nil, err
 		}
 	}
+
+	// ensure the node is treated as a document.
 	if root.Kind != yaml.DocumentNode {
 		root.Kind = yaml.DocumentNode
 	}
+
+	// initialize an empty mapping if the document was empty.
 	if len(root.Content) == 0 {
 		root.Content = []*yaml.Node{{Kind: yaml.MappingNode}}
 	}
+
+	// normalize the first child to a mapping node.
 	if root.Content[0].Kind != yaml.MappingNode {
 		root.Content[0].Kind = yaml.MappingNode
 	}
 
 	seq, order, nodes, err := ensureResourcesSeq(root)
+
 	return root, seq, order, nodes, err
 }
 
@@ -337,24 +324,33 @@ func ensureResourcesSeq(root *yaml.Node) (*yaml.Node, []string, map[string]*yaml
 	mapNode := root.Content[0]
 	var seq *yaml.Node
 	for i := 0; i < len(mapNode.Content); i += 2 {
+		// iterate key/value pairs, keeping resources when found.
 		if i+1 >= len(mapNode.Content) {
 			break
 		}
+
 		key := mapNode.Content[i]
 		if key.Value == "resources" {
+			// stop at the first resources entry so we can reuse its sequence.
 			seq = mapNode.Content[i+1]
 			break
 		}
 	}
+
+	// create a resources sequence if none exists yet.
 	if seq == nil {
 		seq = &yaml.Node{Kind: yaml.SequenceNode}
 		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "resources", Tag: "!!str"}
 		mapNode.Content = append(mapNode.Content, keyNode, seq)
 	}
+
+	// normalize the entry to a sequence node before usage.
 	if seq.Kind != yaml.SequenceNode {
 		seq.Kind = yaml.SequenceNode
 	}
+
 	nodes, order := collectExistingResources(seq)
+
 	return seq, order, nodes, nil
 }
 
@@ -362,26 +358,35 @@ func ensureResourcesSeq(root *yaml.Node) (*yaml.Node, []string, map[string]*yaml
 func collectExistingResources(seq *yaml.Node) (map[string]*yaml.Node, []string) {
 	nodes := make(map[string]*yaml.Node, len(seq.Content))
 	order := make([]string, 0, len(seq.Content))
+
 	for _, node := range seq.Content {
+		// ignore anything that is not a scalar resource entry.
 		if node.Kind != yaml.ScalarNode {
 			continue
 		}
+
+		// record the first occurrence and map the node for reuse.
 		if _, exists := nodes[node.Value]; !exists {
 			order = append(order, node.Value)
 		}
+
 		nodes[node.Value] = node
 	}
+
 	return nodes, order
 }
 
 // mergeResources produces the canonical ordering for resources.
 func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []string) []string {
+	// deduplicate and prepare the directory/file slices.
 	dirs := utils.DedupPreserve(dirEntries)
 	files := utils.DedupPreserve(fileEntries)
 	dirs = p.decorateSubdirs(dirs)
+
 	sort.Strings(dirs)
 	sort.Strings(files)
 
+	// preserve remote resources from existing order.
 	remote := make([]string, 0, len(existing))
 	for _, value := range existing {
 		if isRemoteResource(value) {
@@ -390,6 +395,7 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	}
 	sort.Strings(remote)
 
+	// assemble final ordering respecting dir-first flag.
 	final := make([]string, 0, len(remote)+len(dirs)+len(files))
 	final = append(final, remote...)
 	if p.opts.DirFirst {
@@ -418,25 +424,4 @@ func (p *Processor) decorateSubdirs(subdirs []string) []string {
 		out = append(out, s+"/")
 	}
 	return out
-}
-
-func isYAML(name string) bool {
-	lowered := strings.ToLower(name)
-	return strings.HasSuffix(lowered, ".yaml") || strings.HasSuffix(lowered, ".yml")
-}
-
-func isRemoteResource(entry string) bool {
-	return strings.HasPrefix(entry, "http://") || strings.HasPrefix(entry, "https://")
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

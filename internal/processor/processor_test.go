@@ -14,17 +14,18 @@ func TestMatchSkipPatterns(t *testing.T) {
 
 	proc := New(Options{Skip: []string{"flux/config/**", "flux/*", "plain"}}, logging.New(io.Discard, io.Discard, 0))
 
-	skip, subtree, pattern := proc.matchSkip("flux/config/app", true)
+	skip, mode, pattern := matchSkip("flux/config/app", false, proc.skipRules)
 	require.True(t, skip)
-	assert.True(t, subtree)
+	assert.Equal(t, skipModeSubtree, mode)
 	assert.Equal(t, "flux/config/**", pattern)
 
-	skip, subtree, _ = proc.matchSkip("flux/ignore-me", false)
+	skip, mode, _ = matchSkip("flux/ignore-me", false, proc.skipRules)
 	require.True(t, skip)
-	assert.False(t, subtree)
+	assert.Equal(t, skipModeChildren, mode)
 
-	skip, _, pattern = proc.matchSkip("plain", false)
+	skip, mode, pattern = matchSkip("plain", false, proc.skipRules)
 	require.True(t, skip)
+	assert.Equal(t, skipModeExact, mode)
 	assert.Equal(t, "plain", pattern)
 }
 

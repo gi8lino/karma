@@ -43,7 +43,7 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 		}
 		return nil, err
 	}
-	defer file.Close()
+	defer file.Close() // nolint:errcheck
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
