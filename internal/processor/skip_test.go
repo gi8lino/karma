@@ -20,7 +20,7 @@ func (d dirEntryStub) Info() (os.FileInfo, error) { return nil, nil }
 func TestMatchSkipModes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("subtree", func(t *testing.T) {
+	t.Run("subtree matches directory", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"flux/config/**"})
 		ok, mode, _ := matchSkip("flux/config", true, rules)
@@ -28,14 +28,14 @@ func TestMatchSkipModes(t *testing.T) {
 		assert.Equal(t, skipModeSubtree, mode)
 	})
 
-	t.Run("subtreeDoesNotSkipDescendants", func(t *testing.T) {
+	t.Run("subtree does not skip descendants", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"apps/debug/**"})
 		skip, _, _ := matchSkip("apps/debug/nested", true, rules)
 		assert.False(t, skip)
 	})
 
-	t.Run("children", func(t *testing.T) {
+	t.Run("children rule matches directory", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"flux/config/*"})
 		ok, mode, _ := matchSkip("flux/config/child", true, rules)
@@ -43,7 +43,7 @@ func TestMatchSkipModes(t *testing.T) {
 		assert.Equal(t, skipModeChildren, mode)
 	})
 
-	t.Run("subtreeWithTrailingSlash", func(t *testing.T) {
+	t.Run("subtree with trailing slash matches", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"apps/debug/**/"})
 		ok, mode, _ := matchSkip("apps/debug", true, rules)
@@ -51,7 +51,7 @@ func TestMatchSkipModes(t *testing.T) {
 		assert.Equal(t, skipModeSubtree, mode)
 	})
 
-	t.Run("glob", func(t *testing.T) {
+	t.Run("glob matches pattern", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"flux/*.yaml"})
 		ok, mode, _ := matchSkip("flux/sample.yaml", false, rules)
@@ -59,7 +59,7 @@ func TestMatchSkipModes(t *testing.T) {
 		assert.Equal(t, skipModeGlob, mode)
 	})
 
-	t.Run("exact", func(t *testing.T) {
+	t.Run("exact matches", func(t *testing.T) {
 		t.Parallel()
 		rules := parseSkipRules([]string{"README"})
 		ok, mode, _ := matchSkip("README", false, rules)
@@ -73,7 +73,7 @@ func TestHandleSkipDir(t *testing.T) {
 
 	entry := dirEntryStub{name: "flux/config"}
 
-	t.Run("childrenModeKeepsDirAndSkipsWalk", func(t *testing.T) {
+	t.Run("children mode keeps dir and skips walk", func(t *testing.T) {
 		t.Parallel()
 
 		dirEntries, childDirs := handleSkipDir(entry, skipModeChildren, nil, nil)
@@ -82,7 +82,7 @@ func TestHandleSkipDir(t *testing.T) {
 		assert.True(t, childDirs[0].skipWalk)
 	})
 
-	t.Run("subtreeModeKeepsDirAndSkipsUpdate", func(t *testing.T) {
+	t.Run("subtree mode keeps dir and skips update", func(t *testing.T) {
 		t.Parallel()
 
 		dirEntries, childDirs := handleSkipDir(entry, skipModeSubtree, nil, nil)
@@ -91,7 +91,7 @@ func TestHandleSkipDir(t *testing.T) {
 		assert.True(t, childDirs[0].skipUpdate)
 	})
 
-	t.Run("exactModeDropsDirectory", func(t *testing.T) {
+	t.Run("exact mode drops directory", func(t *testing.T) {
 		t.Parallel()
 
 		dirEntries, childDirs := handleSkipDir(entry, skipModeExact, []string{"foo"}, nil)
@@ -103,17 +103,17 @@ func TestHandleSkipDir(t *testing.T) {
 func TestMatchesPrefixAndChild(t *testing.T) {
 	t.Parallel()
 
-	t.Run("childMatchesDirectDescendant", func(t *testing.T) {
+	t.Run("child matches direct descendant", func(t *testing.T) {
 		t.Parallel()
 		assert.True(t, matchesChild("flux/config/app", "flux/config"))
 	})
 
-	t.Run("childDoesNotMatchNestedMoreThanOneLevel", func(t *testing.T) {
+	t.Run("child does not match nested more than one level", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, matchesChild("flux/config/app/sub", "flux/config"))
 	})
 
-	t.Run("childMatchesRootWithSimpleName", func(t *testing.T) {
+	t.Run("child matches root with simple name", func(t *testing.T) {
 		t.Parallel()
 		assert.True(t, matchesChild("app", ""))
 	})

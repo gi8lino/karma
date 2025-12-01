@@ -114,7 +114,7 @@ func TestErrorLogsToErrWriter(t *testing.T) {
 func TestResourceDiffShowsChanges(t *testing.T) {
 	t.Parallel()
 
-	t.Run("resourcediff", func(t *testing.T) {
+	t.Run("resource diff", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)
@@ -128,7 +128,7 @@ func TestResourceDiffShowsChanges(t *testing.T) {
 func TestResourceDiffSkipWhenNoChange(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nochange", func(t *testing.T) {
+	t.Run("no change", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)

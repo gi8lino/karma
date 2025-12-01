@@ -20,7 +20,7 @@ func TestIsKustomization(t *testing.T) {
 		assert.True(t, isKustomization("kustomization.yml"))
 	})
 
-	t.Run("notKustomization", func(t *testing.T) {
+	t.Run("not kustomization", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, isKustomization("kustomization.txt"))
 	})
@@ -29,17 +29,17 @@ func TestIsKustomization(t *testing.T) {
 func TestIsYAML(t *testing.T) {
 	t.Parallel()
 
-	t.Run("lowerYAML", func(t *testing.T) {
+	t.Run("lower yaml", func(t *testing.T) {
 		t.Parallel()
 		assert.True(t, isYAML("resource.yaml"))
 	})
 
-	t.Run("upperYML", func(t *testing.T) {
+	t.Run("upper yml", func(t *testing.T) {
 		t.Parallel()
 		assert.True(t, isYAML("RESOURCE.YML"))
 	})
 
-	t.Run("notYAML", func(t *testing.T) {
+	t.Run("not yaml", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, isYAML("resource.txt"))
 	})
@@ -58,7 +58,7 @@ func TestIsRemoteResource(t *testing.T) {
 		assert.True(t, isRemoteResource("https://example.com"))
 	})
 
-	t.Run("notRemote", func(t *testing.T) {
+	t.Run("not remote", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, isRemoteResource("file://local"))
 	})
@@ -72,12 +72,12 @@ func TestEqualStrings(t *testing.T) {
 		require.True(t, equalStrings([]string{"a", "b"}, []string{"a", "b"}))
 	})
 
-	t.Run("differentLength", func(t *testing.T) {
+	t.Run("different length", func(t *testing.T) {
 		t.Parallel()
 		require.False(t, equalStrings([]string{"a"}, []string{"a", "b"}))
 	})
 
-	t.Run("differentContent", func(t *testing.T) {
+	t.Run("different content", func(t *testing.T) {
 		t.Parallel()
 		require.False(t, equalStrings([]string{"a", "b"}, []string{"b", "a"}))
 	})

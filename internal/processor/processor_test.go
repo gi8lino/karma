@@ -17,7 +17,7 @@ import (
 func TestProcessorProcess(t *testing.T) {
 	t.Parallel()
 
-	t.Run("createsMissingKustomization", func(t *testing.T) {
+	t.Run("creates missing kustomization", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
@@ -34,7 +34,7 @@ func TestProcessorProcess(t *testing.T) {
 		assert.Contains(t, string(data), "app.yaml")
 	})
 
-	t.Run("reusesUpToDateKustomization", func(t *testing.T) {
+	t.Run("reuses up-to-date kustomization", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
@@ -53,7 +53,7 @@ func TestProcessorProcess(t *testing.T) {
 func TestScanEntriesHonorsSkips(t *testing.T) {
 	t.Parallel()
 
-	t.Run("skipsAndReports", func(t *testing.T) {
+	t.Run("skips and reports", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.Mkdir(filepath.Join(temp, "normal"), 0o755))
@@ -83,7 +83,7 @@ func TestScanEntriesHonorsSkips(t *testing.T) {
 func TestProcessorLoadMatcher(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returnsNilWhenDisabled", func(t *testing.T) {
+	t.Run("returns nil when disabled", func(t *testing.T) {
 		t.Parallel()
 		proc := New(Options{UseGitIgnore: false}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 		matcher, err := proc.loadMatcher(t.TempDir(), nil)
@@ -91,7 +91,7 @@ func TestProcessorLoadMatcher(t *testing.T) {
 		assert.Nil(t, matcher)
 	})
 
-	t.Run("loadsAndRespectsGitignore", func(t *testing.T) {
+	t.Run("loads and respects gitignore", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, ".gitignore"), []byte("secret.txt\n"), 0o644))
@@ -107,7 +107,7 @@ func TestProcessorLoadMatcher(t *testing.T) {
 func TestProcessorRelPath(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returnsBaseNameForRoot", func(t *testing.T) {
+	t.Run("returns basename for root", func(t *testing.T) {
 		t.Parallel()
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 		temp := t.TempDir()
@@ -116,7 +116,7 @@ func TestProcessorRelPath(t *testing.T) {
 		assert.Equal(t, "foo", rel)
 	})
 
-	t.Run("convertsToSlash", func(t *testing.T) {
+	t.Run("converts to slash", func(t *testing.T) {
 		t.Parallel()
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 		base := filepath.Join(t.TempDir(), "base")
@@ -129,7 +129,7 @@ func TestProcessorRelPath(t *testing.T) {
 func TestProcessorPickKustomizationPath(t *testing.T) {
 	t.Parallel()
 
-	t.Run("selectsYamlWhenPresent", func(t *testing.T) {
+	t.Run("selects yaml when present", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -142,7 +142,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		assert.Equal(t, path, got)
 	})
 
-	t.Run("selectsYmlWhenOnlyYmlExists", func(t *testing.T) {
+	t.Run("selects yml when only yml exists", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yml")
@@ -155,7 +155,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		assert.Equal(t, path, got)
 	})
 
-	t.Run("defaultsWhenMissing", func(t *testing.T) {
+	t.Run("defaults when missing", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
@@ -170,7 +170,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 func TestProcessorUpdateKustomization(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rewritesResources", func(t *testing.T) {
+	t.Run("rewrites resources", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -190,7 +190,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		assert.Contains(t, string(data), "alpha.yaml")
 	})
 
-	t.Run("returnsFalseWhenUnchanged", func(t *testing.T) {
+	t.Run("returns false when unchanged", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -211,7 +211,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 func TestProcessorApplyKustomization(t *testing.T) {
 	t.Parallel()
 
-	t.Run("respectsSkipUpdate", func(t *testing.T) {
+	t.Run("respects skip update", func(t *testing.T) {
 		t.Parallel()
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 		updated, noOp, err := proc.applyKustomization("", "", true, nil, nil, true)
@@ -220,7 +220,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		assert.Equal(t, 0, noOp)
 	})
 
-	t.Run("reportsUpdatedWhenChanged", func(t *testing.T) {
+	t.Run("reports updated when changed", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -232,7 +232,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		assert.Equal(t, 0, noOp)
 	})
 
-	t.Run("silentSuppressesNoOpLog", func(t *testing.T) {
+	t.Run("silent suppresses no-op log", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -253,7 +253,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 func TestProcessorLoadKustomization(t *testing.T) {
 	t.Parallel()
 
-	t.Run("loadsExistingFile", func(t *testing.T) {
+	t.Run("loads existing file", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -268,7 +268,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		assert.Contains(t, order, "kept")
 	})
 
-	t.Run("initializesMissingDocument", func(t *testing.T) {
+	t.Run("initializes missing document", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
@@ -286,7 +286,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 func TestEnsureResourcesSeq(t *testing.T) {
 	t.Parallel()
 
-	t.Run("createsSequenceWhenMissing", func(t *testing.T) {
+	t.Run("creates sequence when missing", func(t *testing.T) {
 		t.Parallel()
 		root := &yaml.Node{
 			Kind: yaml.DocumentNode,
@@ -300,7 +300,7 @@ func TestEnsureResourcesSeq(t *testing.T) {
 		assert.Empty(t, order)
 	})
 
-	t.Run("reusesExistingSequence", func(t *testing.T) {
+	t.Run("reuses existing sequence", func(t *testing.T) {
 		t.Parallel()
 		seqNode := &yaml.Node{Kind: yaml.SequenceNode}
 		key := &yaml.Node{Kind: yaml.ScalarNode, Value: "resources"}
@@ -323,7 +323,7 @@ func TestEnsureResourcesSeq(t *testing.T) {
 func TestCollectExistingResources(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexesOnlyScalarNodes", func(t *testing.T) {
+	t.Run("indexes only scalar nodes", func(t *testing.T) {
 		t.Parallel()
 		seq := &yaml.Node{
 			Kind: yaml.SequenceNode,
@@ -346,7 +346,7 @@ func TestCollectExistingResources(t *testing.T) {
 func TestMergeResourcesOrders(t *testing.T) {
 	t.Parallel()
 
-	t.Run("dirFirst", func(t *testing.T) {
+	t.Run("dir first ordering", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{DirSlash: true, DirFirst: true}, logger)
@@ -354,7 +354,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 		require.Equal(t, []string{"https://example.com", "a/", "b/", "y", "z"}, final)
 	})
 
-	t.Run("alphabeticalFallback", func(t *testing.T) {
+	t.Run("alphabetical fallback", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{DirSlash: true, DirFirst: false}, logger)
@@ -366,7 +366,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 func TestProcessorDecorateSubdirs(t *testing.T) {
 	t.Parallel()
 
-	t.Run("appendsSlashWhenEnabled", func(t *testing.T) {
+	t.Run("appends slash when enabled", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{DirSlash: true}, logger)
@@ -374,7 +374,7 @@ func TestProcessorDecorateSubdirs(t *testing.T) {
 		assert.Equal(t, []string{"app/", "config/"}, got)
 	})
 
-	t.Run("leavesInputWhenDisabled", func(t *testing.T) {
+	t.Run("leaves input when disabled", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{DirSlash: false}, logger)

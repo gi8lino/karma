@@ -14,7 +14,7 @@ import (
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	t.Run("successfullyProcessesDirectories", func(t *testing.T) {
+	t.Run("successfully processes directories", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		file := filepath.Join(temp, "app.yaml")
@@ -32,7 +32,7 @@ func TestRun(t *testing.T) {
 		assert.Contains(t, string(data), "app.yaml")
 	})
 
-	t.Run("returnsParseErrorWhenMissingArgs", func(t *testing.T) {
+	t.Run("returns parse error when missing args", func(t *testing.T) {
 		t.Parallel()
 		var out, errOut bytes.Buffer
 		err := Run(context.Background(), "v1.0.0", nil, &out, &errOut)
@@ -40,7 +40,7 @@ func TestRun(t *testing.T) {
 		assert.Contains(t, err.Error(), "positional")
 	})
 
-	t.Run("printsHelpWhenRequested", func(t *testing.T) {
+	t.Run("prints help when requested", func(t *testing.T) {
 		t.Parallel()
 		var out, errOut bytes.Buffer
 		err := Run(context.Background(), "v1.0.0", []string{"--help"}, &out, &errOut)
@@ -49,7 +49,7 @@ func TestRun(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
-	t.Run("printsVersionWhenRequested", func(t *testing.T) {
+	t.Run("prints version when requested", func(t *testing.T) {
 		t.Parallel()
 		var out, errOut bytes.Buffer
 		err := Run(context.Background(), "v9.9.9", []string{"--version"}, &out, &errOut)
