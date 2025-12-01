@@ -35,6 +35,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		IncludeDot:   cfg.IncludeDot,
 		DirSlash:     !cfg.NoDirSlash,
 		DirFirst:     !cfg.NoDirFirst,
+		Silent:       cfg.Silent,
 	}
 
 	var totalUpdated, totalNoOp int

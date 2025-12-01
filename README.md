@@ -10,8 +10,9 @@ kustomizer [options] <base-dir>...
 
 ## Flags
 
-- `-s`, `--skip` – Accepts comma-separated patterns; supports `*` wildcards, `/*` to keep directories but ignore their files, and `/**` to skip entire subtrees.
+- `-s`, `--skip` – Accepts comma-separated patterns; supports `*` wildcards, `/*` to skip a directory’s kustomization without entering it, and `/**` to skip the kustomization but still descend into its children (so those nested dirs can still be handled separately).
 - `-v` – Increase verbosity; pass `-vv` for trace logs.
+- `--silent`, `-q` – Suppress per-kustomization no-op logs while still emitting summary output. `-q` conflicts with `-v`/`-vv`; only one of the logging flags may be specified in a single invocation.
 - `--no-gitignore`, `-g` – Disable per-directory `.gitignore` evaluation.
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--no-dir-slash`, `-D` – Keep directory resources without a trailing slash.

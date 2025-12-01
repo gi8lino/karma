@@ -110,7 +110,7 @@ func (l *Logger) Trace(msg string, kv ...string) {
 // Summary prints the overall update statistics.
 func (l *Logger) Summary(updated, noOp int) {
 	l.log(LevelInfo, "SUMMARY", func() []string {
-		return []string{fmt.Sprintf("updated=%d", updated), fmt.Sprintf("no-op=%d", noOp)}
+		return []string{"updated", fmt.Sprintf("%d", updated), "no-op", fmt.Sprintf("%d", noOp)}
 	})
 }
 

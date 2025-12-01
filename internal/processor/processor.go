@@ -23,6 +23,7 @@ type Options struct {
 	IncludeDot   bool
 	DirSlash     bool
 	DirFirst     bool
+	Silent       bool
 }
 
 // Processor walks directories and keeps kustomization resources in sync.
@@ -285,7 +286,9 @@ func (p *Processor) applyKustomization(
 		return 1, 0, nil
 	}
 
-	p.logger.NoOp(path)
+	if !p.opts.Silent {
+		p.logger.NoOp(path)
+	}
 
 	return 0, 1, nil
 }

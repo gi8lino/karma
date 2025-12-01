@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -224,6 +225,23 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, updated)
 		assert.Equal(t, 0, noOp)
+	})
+
+	t.Run("silentSuppressesNoOpLog", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
+
+		var out bytes.Buffer
+		logger := logging.New(&out, io.Discard, logging.LevelInfo)
+		proc := New(Options{Silent: true}, logger)
+
+		updated, noOp, err := proc.applyKustomization(temp, path, true, []string{"exist"}, nil, false)
+		require.NoError(t, err)
+		assert.Equal(t, 0, updated)
+		assert.Equal(t, 1, noOp)
+		assert.Empty(t, out.String())
 	})
 }
 
