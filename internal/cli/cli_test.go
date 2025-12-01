@@ -16,21 +16,29 @@ func TestParse(t *testing.T) {
 		cfg, err := Parse("1.0.0", []string{
 			"-s", ".img,dashboards",
 			"-s", "patch-*",
-			"-v",
 			"--no-gitignore",
 			"--include-dot",
 			"--no-dir-slash",
 			"--no-dir-first",
+			"-q",
 			"foo",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"foo"}, cfg.BaseDirs)
 		assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
-		assert.Equal(t, 1, cfg.Verbosity)
 		require.True(t, cfg.NoGitIgnore)
 		require.True(t, cfg.IncludeDot)
 		require.True(t, cfg.NoDirSlash)
 		require.True(t, cfg.NoDirFirst)
+		require.True(t, cfg.Mute)
+		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
+	})
+
+	t.Run("verbose flag", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"-vv", "foo"})
+		require.NoError(t, err)
+		assert.Equal(t, 2, cfg.Verbosity)
 	})
 
 	t.Run("defaults", func(t *testing.T) {
@@ -60,5 +68,13 @@ func TestParse(t *testing.T) {
 		_, err := Parse("1.0.0", []string{"--help"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Usage")
+	})
+
+	t.Run("mute flag", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"-q", "foo"})
+		require.NoError(t, err)
+		assert.True(t, cfg.Mute)
+		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
 }

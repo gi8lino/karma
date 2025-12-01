@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os"
@@ -23,10 +22,10 @@ func TestProcessorProcess(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		updated, noOp, err := proc.Process(context.Background(), temp)
+		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
-		assert.Equal(t, 1, updated)
-		assert.Equal(t, 0, noOp)
+		assert.Equal(t, 1, stats.Updated)
+		assert.Equal(t, 0, stats.NoOp)
 
 		data, err := os.ReadFile(filepath.Join(temp, "kustomization.yaml"))
 		require.NoError(t, err)
@@ -40,13 +39,13 @@ func TestProcessorProcess(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		_, _, err := proc.Process(context.Background(), temp)
+		_, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
 
-		updated, noOp, err := proc.Process(context.Background(), temp)
+		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
-		assert.Equal(t, 0, updated)
-		assert.Equal(t, 1, noOp)
+		assert.Equal(t, 0, stats.Updated)
+		assert.Equal(t, 1, stats.NoOp)
 	})
 }
 
@@ -177,12 +176,14 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - existing\n"), 0o644))
 		proc := New(Options{DirSlash: true, DirFirst: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		updated, order, final, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
+		updated, order, final, stats, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
 		require.NoError(t, err)
 		assert.True(t, updated)
+		assert.Equal(t, 0, stats.Reordered)
 		assert.Equal(t, []string{"existing"}, order)
 		assert.Contains(t, final, "added/")
 		assert.Contains(t, final, "alpha.yaml")
+		assert.Greater(t, stats.Added, 0)
 
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -197,14 +198,17 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		_, _, _, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
+		_, _, _, _, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
 		require.NoError(t, err)
 
-		updated, order, final, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
+		updated, order, final, stats, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
 		require.NoError(t, err)
 		assert.False(t, updated)
+		assert.Equal(t, 0, stats.Reordered)
 		assert.Equal(t, []string{"exist"}, order)
 		assert.Equal(t, []string{"exist"}, final)
+		assert.Equal(t, 0, stats.Added)
+		assert.Equal(t, 0, stats.Removed)
 	})
 }
 
@@ -214,10 +218,10 @@ func TestProcessorApplyKustomization(t *testing.T) {
 	t.Run("respects skip update", func(t *testing.T) {
 		t.Parallel()
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
-		updated, noOp, err := proc.applyKustomization("", "", true, nil, nil, true)
+		stats, err := proc.applyKustomization("", "", true, nil, nil, true)
 		require.NoError(t, err)
-		assert.Equal(t, 0, updated)
-		assert.Equal(t, 0, noOp)
+		assert.Equal(t, 0, stats.Updated)
+		assert.Equal(t, 0, stats.NoOp)
 	})
 
 	t.Run("reports updated when changed", func(t *testing.T) {
@@ -226,28 +230,12 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		path := filepath.Join(temp, "kustomization.yaml")
 		proc := New(Options{DirSlash: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		updated, noOp, err := proc.applyKustomization(temp, path, false, []string{"dir"}, []string{"file.yaml"}, false)
+		stats, err := proc.applyKustomization(temp, path, false, []string{"dir"}, []string{"file.yaml"}, false)
 		require.NoError(t, err)
-		assert.Equal(t, 1, updated)
-		assert.Equal(t, 0, noOp)
+		assert.Equal(t, 1, stats.Updated)
+		assert.Equal(t, 0, stats.NoOp)
 	})
 
-	t.Run("silent suppresses no-op log", func(t *testing.T) {
-		t.Parallel()
-		temp := t.TempDir()
-		path := filepath.Join(temp, "kustomization.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
-
-		var out bytes.Buffer
-		logger := logging.New(&out, io.Discard, logging.LevelInfo)
-		proc := New(Options{Silent: true}, logger)
-
-		updated, noOp, err := proc.applyKustomization(temp, path, true, []string{"exist"}, nil, false)
-		require.NoError(t, err)
-		assert.Equal(t, 0, updated)
-		assert.Equal(t, 1, noOp)
-		assert.Empty(t, out.String())
-	})
 }
 
 func TestProcessorLoadKustomization(t *testing.T) {
@@ -380,5 +368,34 @@ func TestProcessorDecorateSubdirs(t *testing.T) {
 		proc := New(Options{DirSlash: false}, logger)
 		got := proc.decorateSubdirs([]string{"app", "config"})
 		assert.Equal(t, []string{"app", "config"}, got)
+	})
+}
+
+func TestOrderChangedDetection(t *testing.T) {
+	t.Parallel()
+
+	t.Run("detects reorder only", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, orderChanged([]string{"a", "b", "c"}, []string{"b", "a", "c"}))
+	})
+
+	t.Run("ignores identical order", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, orderChanged([]string{"a", "b"}, []string{"a", "b"}))
+	})
+
+	t.Run("detects reorder even with additions", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, orderChanged([]string{"a", "b"}, []string{"b", "a", "c"}))
+	})
+
+	t.Run("ignores added entries that don't reorder", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, orderChanged([]string{"a", "b"}, []string{"a", "b", "c"}))
+	})
+
+	t.Run("ignores removal without reorder", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, orderChanged([]string{"a", "b"}, []string{"b"}))
 	})
 }

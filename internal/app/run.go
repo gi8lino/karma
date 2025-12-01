@@ -23,8 +23,8 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		return fmt.Errorf("CLI flags error: %w", err)
 	}
 
-	logger := logging.New(stdOut, stdErr, logging.LevelFromVerbosity(cfg.Verbosity))
-	defer logger.Flush()
+	logLevel := logging.LevelFromVerbosity(cfg.Verbosity)
+	logger := logging.New(stdOut, stdErr, logLevel)
 
 	logger.Debug("version", version)
 	logger.Debug("skip", fmt.Sprintf("%v", cfg.SkipPatterns))
@@ -35,23 +35,25 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		IncludeDot:   cfg.IncludeDot,
 		DirSlash:     !cfg.NoDirSlash,
 		DirFirst:     !cfg.NoDirFirst,
-		Silent:       cfg.Silent,
 	}
 
-	var totalUpdated, totalNoOp int
+	var totalStats processor.ResourceStats
 	for _, dir := range cfg.BaseDirs {
 		logger.Processing("base", "path", dir)
 		proc := processor.New(opts, logger)
-		updated, noOp, err := proc.Process(ctx, dir)
+		stats, err := proc.Process(ctx, dir)
 		if err != nil {
 			return err
 		}
 
-		totalUpdated += updated
-		totalNoOp += noOp
+		totalStats.Reordered += stats.Reordered
+		totalStats.Added += stats.Added
+		totalStats.Removed += stats.Removed
+		totalStats.Updated += stats.Updated
+		totalStats.NoOp += stats.NoOp
 	}
 
-	logger.Summary(totalUpdated, totalNoOp)
+	logger.Summary(totalStats.Updated, totalStats.NoOp, totalStats.Reordered, totalStats.Added, totalStats.Removed)
 
 	return nil
 }

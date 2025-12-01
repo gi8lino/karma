@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestIsKustomization(t *testing.T) {
@@ -61,24 +60,5 @@ func TestIsRemoteResource(t *testing.T) {
 	t.Run("not remote", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, isRemoteResource("file://local"))
-	})
-}
-
-func TestEqualStrings(t *testing.T) {
-	t.Parallel()
-
-	t.Run("same", func(t *testing.T) {
-		t.Parallel()
-		require.True(t, equalStrings([]string{"a", "b"}, []string{"a", "b"}))
-	})
-
-	t.Run("different length", func(t *testing.T) {
-		t.Parallel()
-		require.False(t, equalStrings([]string{"a"}, []string{"a", "b"}))
-	})
-
-	t.Run("different content", func(t *testing.T) {
-		t.Parallel()
-		require.False(t, equalStrings([]string{"a", "b"}, []string{"b", "a"}))
 	})
 }

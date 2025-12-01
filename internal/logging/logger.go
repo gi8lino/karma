@@ -34,17 +34,23 @@ const (
 	LevelOff LogLevel = iota
 	LevelError
 	LevelInfo
+	LevelVerbose
 	LevelDebug
 	LevelTrace
 )
 
 // LevelFromVerbosity maps a CLI verbosity counter to an internal log level.
 func LevelFromVerbosity(v int) LogLevel {
+	if v < 0 {
+		return LevelOff
+	}
 	switch {
-	case v >= 2:
+	case v >= 3:
 		return LevelTrace
-	case v == 1:
+	case v == 2:
 		return LevelDebug
+	case v == 1:
+		return LevelVerbose
 	default:
 		return LevelInfo
 	}
@@ -59,7 +65,11 @@ type Logger struct {
 
 // New creates a logger that renders on the provided writers.
 func New(out, err io.Writer, level LogLevel) *Logger {
-	return &Logger{out: out, err: err, minLevel: level}
+	return &Logger{
+		out:      out,
+		err:      err,
+		minLevel: level,
+	}
 }
 
 // Flush exists for symmetry with buffered I/O.
@@ -67,63 +77,70 @@ func (l *Logger) Flush() {}
 
 // Processing logs the current directory when the console level allows it.
 func (l *Logger) Processing(kind string, kv ...string) {
-	l.log(LevelInfo, "PROCESS", func() []string {
+	l.log(l.out, LevelInfo, "PROCESS", func() []string {
 		return append([]string{"kind", kind}, kv...)
 	})
 }
 
 // Skipped logs resources that were skipped because of a rule.
 func (l *Logger) Skipped(kv ...string) {
-	l.log(LevelInfo, "SKIPPING", func() []string {
+	l.log(l.out, LevelDebug, "SKIPPING", func() []string {
 		return kv
 	})
 }
 
 // Updated logs that a kustomization was rewritten.
 func (l *Logger) Updated(path string, kv ...string) {
-	l.log(LevelInfo, "UPDATED", func() []string {
+	l.log(l.out, LevelInfo, "UPDATED", func() []string {
 		return append([]string{"kustomization", path}, kv...)
 	})
 }
 
 // NoOp logs that a kustomization was already in sync.
 func (l *Logger) NoOp(path string, kv ...string) {
-	l.log(LevelInfo, "NO-OP", func() []string {
+	l.log(l.out, LevelDebug, "NO-OP", func() []string {
 		return append([]string{"kustomization", path}, kv...)
 	})
 }
 
 // Debug logs debug-level output when the log level permits.
 func (l *Logger) Debug(msg string, kv ...string) {
-	l.log(LevelDebug, "DEBUG", func() []string {
+	l.log(l.out, LevelDebug, "DEBUG", func() []string {
 		return append([]string{"message", msg}, kv...)
 	})
 }
 
 // Trace logs trace-level output when the log level permits.
 func (l *Logger) Trace(msg string, kv ...string) {
-	l.log(LevelTrace, "TRACE", func() []string {
+	l.log(l.out, LevelTrace, "TRACE", func() []string {
 		return append([]string{"message", msg}, kv...)
 	})
 }
 
 // Summary prints the overall update statistics.
-func (l *Logger) Summary(updated, noOp int) {
-	l.log(LevelInfo, "SUMMARY", func() []string {
-		return []string{"updated", fmt.Sprintf("%d", updated), "no-op", fmt.Sprintf("%d", noOp)}
+func (l *Logger) Summary(updated, noOp, reordered, added, removed int) {
+	l.log(l.out, LevelInfo, "SUMMARY", func() []string {
+		kv := []string{
+			"updated", fmt.Sprintf("%d", updated),
+			"no-op", fmt.Sprintf("%d", noOp),
+			"order", fmt.Sprintf("%d", reordered),
+			"added", fmt.Sprintf("%d", added),
+			"removed", fmt.Sprintf("%d", removed),
+		}
+		return kv
 	})
 }
 
 // Error logs an error to stderr regardless of verbosity.
 func (l *Logger) Error(msg string, kv ...string) {
-	l.log(LevelError, "ERROR", func() []string {
+	l.log(l.err, LevelError, "ERROR", func() []string {
 		return append([]string{"message", msg}, kv...)
 	})
 }
 
 // ResourceDiff prints an old/new snapshot of the resources block.
 func (l *Logger) ResourceDiff(old, new []string) {
-	if l.minLevel < LevelInfo {
+	if l.minLevel < LevelVerbose {
 		return
 	}
 	const diffIndent = "           "
@@ -132,20 +149,23 @@ func (l *Logger) ResourceDiff(old, new []string) {
 		return
 	}
 	for _, line := range removed {
-		fmt.Fprintf(l.out, "%s%s-  - %s%s\n", colorRed, diffIndent, line, colorReset) // nolint:errcheck
+		fmt.Fprintf(l.out, "%s%s-  - %q%s\n", colorRed, diffIndent, line, colorReset) // nolint:errcheck
 	}
 	for _, line := range added {
-		fmt.Fprintf(l.out, "%s%s+  - %s%s\n", colorGreen, diffIndent, line, colorReset) // nolint:errcheck
+		fmt.Fprintf(l.out, "%s%s+  - %q%s\n", colorGreen, diffIndent, line, colorReset) // nolint:errcheck
 	}
 }
 
 // diffStrings returns removed and added entries between two slices of resources.
 func diffStrings(old, new []string) (removed, added []string) {
 	counts := make(map[string]int, len(old))
+
+	// Count the number of times each resource is in the
 	for _, entry := range old {
 		counts[entry]++
 	}
 
+	// Count the number of times each resource is in the new list.
 	for _, entry := range new {
 		if counts[entry] > 0 {
 			counts[entry]--
@@ -157,6 +177,7 @@ func diffStrings(old, new []string) (removed, added []string) {
 		added = append(added, entry)
 	}
 
+	// Collect the removed resources.
 	for _, entry := range old {
 		if c, ok := counts[entry]; ok && c > 0 {
 			removed = append(removed, entry)
@@ -171,23 +192,16 @@ func diffStrings(old, new []string) (removed, added []string) {
 }
 
 // log executes the provided builder when the configured level allows it.
-func (l *Logger) log(level LogLevel, tag string, builder func() []string) {
+func (l *Logger) log(w io.Writer, level LogLevel, tag string, builder func() []string) {
 	if level > l.minLevel || builder == nil {
 		return
 	}
 	kv := builder()
-	l.write(tag, kv)
+	l.write(w, tag, kv)
 }
 
 // write renders a formatted log line to the configured output stream.
-func (l *Logger) write(tag string, kv []string) {
-	target := l.out
-	if tag == "ERROR" {
-		target = l.err
-	}
-	if target == nil {
-		return
-	}
+func (l *Logger) write(w io.Writer, tag string, kv []string) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck
 	for i := 0; i < len(kv); i += 2 {
@@ -197,5 +211,5 @@ func (l *Logger) write(tag string, kv []string) {
 		}
 		fmt.Fprintf(&b, " %s", kv[i]) // nolint:errcheck
 	}
-	fmt.Fprintln(target, b.String()) // nolint:errcheck
+	fmt.Fprintln(w, b.String()) // nolint:errcheck
 }

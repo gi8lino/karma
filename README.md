@@ -11,8 +11,9 @@ karma [options] <base-dir>...
 ## Flags
 
 - `-s`, `--skip` – Accepts comma-separated patterns; supports `*` wildcards, `/*` to skip a directory’s kustomization without entering it, and `/**` to skip the kustomization but still descend into its children (so those nested dirs can still be handled separately).
-- `-v` – Increase verbosity; pass `-vv` for trace logs.
-- `--silent`, `-q` – Suppress per-kustomization no-op logs while still emitting summary output. `-q` conflicts with `-v`/`-vv`; only one of the logging flags may be specified in a single invocation.
+- `-v` – Increase verbosity to show resource diffs.
+- `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
+- `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.
 - `--no-gitignore`, `-g` – Disable per-directory `.gitignore` evaluation.
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--no-dir-slash`, `-D` – Keep directory resources without a trailing slash.
@@ -20,9 +21,10 @@ karma [options] <base-dir>...
 
 ## Logging
 
-- Colored output tags like `[UPDATED]`, `[SKIPPING]`, `[TRACE]`, and `[SUMMARY]` reflect the action taken.
-- Trace mode (`-vv`) emits detailed traversal info and skip reasons, while `-v` shows skips and summary.
-- The logger prints resource diffs before rewriting `kustomization.yaml`, showing removed (`-`) and added (`+`) lines.
+- Default output shows `[PROCESS]`, `[UPDATED]`, and `[SUMMARY]`.
+- `-v` adds the resource diff (`-  - foo` / `+  - bar` lines).
+- `-vv` ups the level so `[NO-OP]` and `[SKIPPING]` appear as well.
+- `--mute`, `-q` shuts logging off entirely.
 
 ## Features
 

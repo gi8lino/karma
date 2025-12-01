@@ -33,7 +33,7 @@ func TestSkippingLogsWhenEnabled(t *testing.T) {
 	t.Run("skipping", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
-		logger := New(out, nil, LevelInfo)
+		logger := New(out, nil, LevelDebug)
 		logger.Skipped("path", "flux/config")
 		assert.Contains(t, stripANSI(t, out.String()), "[SKIPPING]")
 	})
@@ -57,9 +57,29 @@ func TestNoOpLogsWithLevel(t *testing.T) {
 	t.Run("noop", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
-		logger := New(out, nil, LevelInfo)
+		logger := New(out, nil, LevelDebug)
 		logger.NoOp("/tmp/kustomization.yaml")
 		assert.Contains(t, stripANSI(t, out.String()), "[NO-OP   ]")
+	})
+}
+
+func TestSkippingAndNoOpHiddenAtLowerLevel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no skip at info", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelInfo)
+		logger.Skipped("path", "flux/config")
+		assert.Empty(t, stripANSI(t, out.String()))
+	})
+
+	t.Run("no noop at verbose", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelVerbose)
+		logger.NoOp("/tmp/kustomization.yaml")
+		assert.Empty(t, stripANSI(t, out.String()))
 	})
 }
 
@@ -94,7 +114,7 @@ func TestSummaryAlwaysLogs(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)
-		logger.Summary(2, 1)
+		logger.Summary(2, 1, 0, 0, 0)
 		assert.Contains(t, stripANSI(t, out.String()), "[SUMMARY ]")
 	})
 }
@@ -117,11 +137,10 @@ func TestResourceDiffShowsChanges(t *testing.T) {
 	t.Run("resource diff", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
-		logger := New(out, nil, LevelInfo)
+		logger := New(out, nil, LevelVerbose)
 		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
 		stripped := stripANSI(t, out.String())
-		assert.NotContains(t, stripped, "-resources")
-		require.Contains(t, stripped, "+  - new")
+		require.Contains(t, stripped, "+  - \"new\"")
 	})
 }
 
@@ -133,6 +152,46 @@ func TestResourceDiffSkipWhenNoChange(t *testing.T) {
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)
 		logger.ResourceDiff([]string{"app"}, []string{"app"})
+		assert.Empty(t, stripANSI(t, out.String()))
+	})
+}
+
+func TestLevelFromVerbosity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mute takes precedence", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, LevelOff, LevelFromVerbosity(-1))
+	})
+
+	t.Run("verbosity honors trace", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, LevelTrace, LevelFromVerbosity(3))
+	})
+
+	t.Run("verbosity honors debug", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, LevelDebug, LevelFromVerbosity(2))
+	})
+
+	t.Run("verbosity uses verbose level for -v", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, LevelVerbose, LevelFromVerbosity(1))
+	})
+
+	t.Run("verbosity defaults to info", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, LevelInfo, LevelFromVerbosity(0))
+	})
+}
+
+func TestResourceDiffHiddenAtInfo(t *testing.T) {
+	t.Parallel()
+	t.Run("info level hides diff", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelInfo)
+		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
 		assert.Empty(t, stripANSI(t, out.String()))
 	})
 }

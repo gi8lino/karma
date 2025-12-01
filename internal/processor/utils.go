@@ -17,16 +17,3 @@ func isYAML(name string) bool {
 func isRemoteResource(entry string) bool {
 	return strings.HasPrefix(entry, "http://") || strings.HasPrefix(entry, "https://")
 }
-
-// equalStrings reports whether two string slices are identical.
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
