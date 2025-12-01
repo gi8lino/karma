@@ -131,7 +131,7 @@ func (p *Processor) scanEntries(
 		// ask the skip matcher whether this resource should be withheld.
 		skip, mode, pattern := matchSkip(rel, entry.IsDir(), p.skipRules)
 		if skip {
-			p.logger.Skipped("path", rel, "reason", pattern)
+			p.logger.Skipped("path", rel, "reason", "pattern", "pattern", pattern)
 			if !entry.IsDir() {
 				continue
 			}
