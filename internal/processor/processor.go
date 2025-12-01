@@ -200,21 +200,18 @@ func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 }
 
 // updateKustomization rewrites the resources section if it changed.
-func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fileEntries []string) (bool, error) {
+func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fileEntries []string) (updated bool, order, final []string, err error) {
 	// load or initialize the target YAML document.
 	root, seq, order, nodes, err := p.loadKustomization(path, exists)
 	if err != nil {
-		return false, err
+		return false, nil, nil, err
 	}
 
 	// build the canonical resource order.
-	final := p.mergeResources(order, dirEntries, fileEntries)
+	final = p.mergeResources(order, dirEntries, fileEntries)
 	if equalStrings(final, order) {
-		return false, nil
+		return false, order, final, nil
 	}
-
-	// show the diff before rewriting.
-	p.logger.ResourceDiff(order, final)
 
 	// build scalar nodes for each entry.
 	content := make([]*yaml.Node, 0, len(final))
@@ -237,30 +234,30 @@ func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fi
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err := enc.Encode(root); err != nil {
-		return false, fmt.Errorf("encode: %w", err)
+		return false, nil, nil, fmt.Errorf("encode: %w", err)
 	}
 	if err := enc.Close(); err != nil {
-		return false, fmt.Errorf("close encoder: %w", err)
+		return false, nil, nil, fmt.Errorf("close encoder: %w", err)
 	}
 
 	// create or truncate the target file before writing the encoded YAML.
 	file, err := os.Create(path)
 	if err != nil {
-		return false, fmt.Errorf("create %s: %w", path, err)
+		return false, nil, nil, fmt.Errorf("create %s: %w", path, err)
 	}
 	defer file.Close() // nolint:errcheck
 
 	// always prepend the canonical document start.
 	if _, err := file.WriteString("---\n"); err != nil {
-		return false, fmt.Errorf("write prefix: %w", err)
+		return false, nil, nil, fmt.Errorf("write prefix: %w", err)
 	}
 
 	// write the encoded document after the header.
 	if _, err := file.Write(buf.Bytes()); err != nil {
-		return false, fmt.Errorf("write content: %w", err)
+		return false, nil, nil, fmt.Errorf("write content: %w", err)
 	}
 
-	return true, nil
+	return true, order, final, nil
 }
 
 // applyKustomization decides whether to rewrite a kustomization based on skip flags.
@@ -276,13 +273,14 @@ func (p *Processor) applyKustomization(
 	}
 
 	// rewrite the file unless skipUpdate was requested.
-	updatedDir, err := p.updateKustomization(path, exists, dirEntries, fileEntries)
+	updatedDir, order, final, err := p.updateKustomization(path, exists, dirEntries, fileEntries)
 	if err != nil {
 		return 0, 0, err
 	}
 	// log whether we updated anything.
 	if updatedDir {
 		p.logger.Updated(path)
+		p.logger.ResourceDiff(order, final)
 		return 1, 0, nil
 	}
 

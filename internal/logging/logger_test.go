@@ -120,7 +120,19 @@ func TestResourceDiffShowsChanges(t *testing.T) {
 		logger := New(out, nil, LevelInfo)
 		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
 		stripped := stripANSI(t, out.String())
-		require.Contains(t, stripped, "-resources:")
-		assert.Contains(t, stripped, "+resources:")
+		assert.NotContains(t, stripped, "-resources")
+		require.Contains(t, stripped, "+  - new")
+	})
+}
+
+func TestResourceDiffSkipWhenNoChange(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nochange", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelInfo)
+		logger.ResourceDiff([]string{"app"}, []string{"app"})
+		assert.Empty(t, stripANSI(t, out.String()))
 	})
 }

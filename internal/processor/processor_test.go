@@ -177,9 +177,12 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - existing\n"), 0o644))
 		proc := New(Options{DirSlash: true, DirFirst: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		updated, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
+		updated, order, final, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
 		require.NoError(t, err)
 		assert.True(t, updated)
+		assert.Equal(t, []string{"existing"}, order)
+		assert.Contains(t, final, "added/")
+		assert.Contains(t, final, "alpha.yaml")
 
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -194,12 +197,14 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		_, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
+		_, _, _, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
 		require.NoError(t, err)
 
-		updated, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
+		updated, order, final, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
 		require.NoError(t, err)
 		assert.False(t, updated)
+		assert.Equal(t, []string{"exist"}, order)
+		assert.Equal(t, []string{"exist"}, final)
 	})
 }
 

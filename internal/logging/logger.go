@@ -126,19 +126,51 @@ func (l *Logger) ResourceDiff(old, new []string) {
 	if l.minLevel < LevelInfo {
 		return
 	}
-	oldLines := resourceBlockLines(old)
-	newLines := resourceBlockLines(new)
-	if len(oldLines) == 0 && len(newLines) == 0 {
+	const diffIndent = "           "
+	removed, added := diffStrings(old, new)
+	if len(removed) == 0 && len(added) == 0 {
 		return
 	}
-	for _, line := range oldLines {
-		fmt.Fprintf(l.out, "%s-%s%s\n", colorRed, line, colorReset) // nolint:errcheck
+	for _, line := range removed {
+		fmt.Fprintf(l.out, "%s%s-  - %s%s\n", colorRed, diffIndent, line, colorReset) // nolint:errcheck
 	}
-	for _, line := range newLines {
-		fmt.Fprintf(l.out, "%s+%s%s\n", colorGreen, line, colorReset) // nolint:errcheck
+	for _, line := range added {
+		fmt.Fprintf(l.out, "%s%s+  - %s%s\n", colorGreen, diffIndent, line, colorReset) // nolint:errcheck
 	}
 }
 
+// diffStrings returns removed and added entries between two slices of resources.
+func diffStrings(old, new []string) (removed, added []string) {
+	counts := make(map[string]int, len(old))
+	for _, entry := range old {
+		counts[entry]++
+	}
+
+	for _, entry := range new {
+		if counts[entry] > 0 {
+			counts[entry]--
+			if counts[entry] == 0 {
+				delete(counts, entry)
+			}
+			continue
+		}
+		added = append(added, entry)
+	}
+
+	for _, entry := range old {
+		if c, ok := counts[entry]; ok && c > 0 {
+			removed = append(removed, entry)
+			counts[entry]--
+			if counts[entry] == 0 {
+				delete(counts, entry)
+			}
+		}
+	}
+
+	return removed, added
+}
+
+// log executes the provided builder when the configured level allows it.
 func (l *Logger) log(level LogLevel, tag string, builder func() []string) {
 	if level > l.minLevel || builder == nil {
 		return
@@ -147,6 +179,7 @@ func (l *Logger) log(level LogLevel, tag string, builder func() []string) {
 	l.write(tag, kv)
 }
 
+// write renders a formatted log line to the configured output stream.
 func (l *Logger) write(tag string, kv []string) {
 	target := l.out
 	if tag == "ERROR" {
@@ -165,15 +198,4 @@ func (l *Logger) write(tag string, kv []string) {
 		fmt.Fprintf(&b, " %s", kv[i]) // nolint:errcheck
 	}
 	fmt.Fprintln(target, b.String()) // nolint:errcheck
-}
-
-func resourceBlockLines(entries []string) []string {
-	if len(entries) == 0 {
-		return []string{"resources: []"}
-	}
-	lines := []string{"resources:"}
-	for _, entry := range entries {
-		lines = append(lines, fmt.Sprintf("  - %s", entry))
-	}
-	return lines
 }
