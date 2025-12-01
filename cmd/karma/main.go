@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gi8lino/kustomizer/internal/app"
+	"github.com/gi8lino/karma/internal/app"
 )
 
 var (

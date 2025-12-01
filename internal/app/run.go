@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gi8lino/kustomizer/internal/cli"
-	"github.com/gi8lino/kustomizer/internal/logging"
-	"github.com/gi8lino/kustomizer/internal/processor"
+	"github.com/gi8lino/karma/internal/cli"
+	"github.com/gi8lino/karma/internal/logging"
+	"github.com/gi8lino/karma/internal/processor"
 
 	"github.com/containeroo/tinyflags"
 )
@@ -52,5 +52,6 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 	}
 
 	logger.Summary(totalUpdated, totalNoOp)
+
 	return nil
 }

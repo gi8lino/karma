@@ -3,7 +3,7 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/gi8lino/kustomizer/internal/utils"
+	"github.com/gi8lino/karma/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 

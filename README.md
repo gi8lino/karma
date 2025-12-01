@@ -1,11 +1,11 @@
-# kustomizer
+# karma - Kustomization Resource Management Assistant
 
-kustomizer keeps nested `kustomization.yaml` files in sync with the directory tree while preserving comments, respecting `.gitignore`, and honoring user-provided skip rules.
+karma keeps nested `kustomization.yaml` files in sync with the directory tree while preserving comments, respecting `.gitignore`, and honoring user-provided skip rules.
 
 ## Usage
 
 ```sh
-kustomizer [options] <base-dir>...
+karma [options] <base-dir>...
 ```
 
 ## Flags
@@ -40,3 +40,7 @@ GOPROXY=off GOSUMDB=off GOCACHE=/tmp/go-build go test ./...
 ## Releases
 
 - Builds use [goreleaser](https://goreleaser.com/) targeting macOS (amd64/arm64) and Windows (amd64/arm64) binaries.
+
+## License
+
+This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file for details.

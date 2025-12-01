@@ -1,5 +1,5 @@
 ---
-project_name: kustomizer
+project_name: karma
 before:
   hooks:
     - go mod tidy
@@ -7,7 +7,7 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 builds:
-  - main: ./cmd/kustomizer/main.go
+  - main: ./cmd/karma/main.go
     env:
       - CGO_ENABLED=0
     goos:

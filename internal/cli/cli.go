@@ -18,7 +18,7 @@ type Config struct {
 
 // Parse builds user configuration from CLI args.
 func Parse(version string, args []string) (Config, error) {
-	fs := tinyflags.NewFlagSet("kustomizer", tinyflags.ContinueOnError)
+	fs := tinyflags.NewFlagSet("karma", tinyflags.ContinueOnError)
 	fs.Version(version)
 	fs.RequirePositional(1)
 

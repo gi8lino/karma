@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gi8lino/kustomizer/internal/gitignore"
-	"github.com/gi8lino/kustomizer/internal/logging"
-	"github.com/gi8lino/kustomizer/internal/utils"
+	"github.com/gi8lino/karma/internal/gitignore"
+	"github.com/gi8lino/karma/internal/logging"
+	"github.com/gi8lino/karma/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 

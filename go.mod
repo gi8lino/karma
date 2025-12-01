@@ -1,4 +1,4 @@
-module github.com/gi8lino/kustomizer
+module github.com/gi8lino/karma
 
 go 1.25.4
 
