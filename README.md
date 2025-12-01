@@ -1,29 +1,41 @@
 # kustomizer
 
-kustomizer is a small tool to keep nested `kustomization.yaml` files in sync with the directory layout while respecting `.gitignore` and custom skip patterns.
+kustomizer keeps nested `kustomization.yaml` files in sync with the directory tree while preserving comments, respecting `.gitignore`, and honoring user-provided skip rules.
 
 ## Usage
 
 ```sh
-go run cmd/kustomizer/main.go [options] <base-dir>...
+kustomizer [options] <base-dir>...
 ```
 
-### Flags
+## Flags
 
-- `-s`, `--skip` – Accepts comma-separated patterns (supports `*` wildcards and `/**`/`/*` suffixes).
-- `-v` – Increase verbosity (use `-vv` to enable tracing output).
-- `--no-gitignore` – Disable `.gitignore` handling.
-- `--include-dot` – Include dotfiles and directories in the scan.
-- `--no-dir-slash` – Keep directory entries without a trailing slash.
-- `--no-dir-first` – Disable directory-first ordering.
+- `-s`, `--skip` – Accepts comma-separated patterns; supports `*` wildcards, `/*` to keep directories but ignore their files, and `/**` to skip entire subtrees.
+- `-v` – Increase verbosity; pass `-vv` for trace logs.
+- `--no-gitignore`, `-g` – Disable per-directory `.gitignore` evaluation.
+- `--include-dot`, `-i` – Include dotfiles and dot-directories.
+- `--no-dir-slash`, `-D` – Keep directory resources without a trailing slash.
+- `--no-dir-first`, `-F` – Disable directory-first ordering.
+
+## Logging
+
+- Colored output tags like `[UPDATED]`, `[SKIPPING]`, `[TRACE]`, and `[SUMMARY]` reflect the action taken.
+- Trace mode (`-vv`) emits detailed traversal info and skip reasons, while `-v` shows skips and summary.
+- The logger prints resource diffs before rewriting `kustomization.yaml`, showing removed (`-`) and added (`+`) lines.
 
 ## Features
 
-- Preserves existing YAML comments and order while touching only the `resources` field.
-- Keeps remote resources intact and sorts directories/files per configuration.
-- Honors `.gitignore` files (per directory) unless disabled.
-- Offers skip patterns for files, directories, and entire subtrees.
+- Writes only the `resources` block, preserving other fields and comments.
+- Supports remote resources, optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
+- Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
+- Plans and updates per base directory, reporting a final summary.
 
 ## Testing
 
-Run `go test ./...` to exercise the CLI, processor, gitignore, and logging helpers.
+```sh
+GOPROXY=off GOSUMDB=off GOCACHE=/tmp/go-build go test ./...
+```
+
+## Releases
+
+- Builds use [goreleaser](https://goreleaser.com/) targeting macOS (amd64/arm64) and Windows (amd64/arm64) binaries.

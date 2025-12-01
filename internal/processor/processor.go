@@ -263,7 +263,12 @@ func (p *Processor) updateKustomization(path string, exists bool, dirEntries, fi
 }
 
 // applyKustomization decides whether to rewrite a kustomization based on skip flags.
-func (p *Processor) applyKustomization(dir, path string, exists bool, dirEntries, fileEntries []string, skipUpdate bool) (updated, noOp int, err error) {
+func (p *Processor) applyKustomization(
+	dir, path string,
+	exists bool,
+	dirEntries, fileEntries []string,
+	skipUpdate bool,
+) (updated, noOp int, err error) {
 	if skipUpdate {
 		p.logger.Trace("skip-update", "dir", dir)
 		return 0, 0, nil
@@ -286,15 +291,21 @@ func (p *Processor) applyKustomization(dir, path string, exists bool, dirEntries
 }
 
 // loadKustomization reads or initializes the YAML document.
-func (p *Processor) loadKustomization(path string, exists bool) (*yaml.Node, *yaml.Node, []string, map[string]*yaml.Node, error) {
-	root := &yaml.Node{}
+func (p *Processor) loadKustomization(
+	path string,
+	exists bool,
+) (root *yaml.Node, seq *yaml.Node, order []string, nodes map[string]*yaml.Node, err error) {
+	root = &yaml.Node{}
+
 	if exists {
 		// read the existing node tree to preserve comments.
-		data, err := os.ReadFile(path)
+		var data []byte
+		data, err = os.ReadFile(path)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		if err := yaml.Unmarshal(data, root); err != nil {
+		err = yaml.Unmarshal(data, root)
+		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
@@ -314,15 +325,13 @@ func (p *Processor) loadKustomization(path string, exists bool) (*yaml.Node, *ya
 		root.Content[0].Kind = yaml.MappingNode
 	}
 
-	seq, order, nodes, err := ensureResourcesSeq(root)
-
+	seq, order, nodes, err = ensureResourcesSeq(root)
 	return root, seq, order, nodes, err
 }
 
 // ensureResourcesSeq guarantees the resources block exists.
-func ensureResourcesSeq(root *yaml.Node) (*yaml.Node, []string, map[string]*yaml.Node, error) {
+func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes map[string]*yaml.Node, err error) {
 	mapNode := root.Content[0]
-	var seq *yaml.Node
 	for i := 0; i < len(mapNode.Content); i += 2 {
 		// iterate key/value pairs, keeping resources when found.
 		if i+1 >= len(mapNode.Content) {
@@ -349,15 +358,14 @@ func ensureResourcesSeq(root *yaml.Node) (*yaml.Node, []string, map[string]*yaml
 		seq.Kind = yaml.SequenceNode
 	}
 
-	nodes, order := collectExistingResources(seq)
-
-	return seq, order, nodes, nil
+	nodes, order = collectExistingResources(seq)
+	return seq, order, nodes, err
 }
 
 // collectExistingResources indexes the existing sequence nodes.
-func collectExistingResources(seq *yaml.Node) (map[string]*yaml.Node, []string) {
-	nodes := make(map[string]*yaml.Node, len(seq.Content))
-	order := make([]string, 0, len(seq.Content))
+func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, order []string) {
+	nodes = make(map[string]*yaml.Node, len(seq.Content))
+	order = make([]string, 0, len(seq.Content))
 
 	for _, node := range seq.Content {
 		// ignore anything that is not a scalar resource entry.
@@ -398,14 +406,17 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	// assemble final ordering respecting dir-first flag.
 	final := make([]string, 0, len(remote)+len(dirs)+len(files))
 	final = append(final, remote...)
+
 	if p.opts.DirFirst {
-		final = append(final, dirs...)
-		final = append(final, files...)
-	} else {
-		all := append(append([]string{}, dirs...), files...)
-		sort.Strings(all)
-		final = append(final, all...)
+		final = append(final, dirs...)  // copy dirs into a fresh slice
+		final = append(final, files...) // append a copy of files
+		return utils.DedupPreserve(final)
 	}
+
+	all := append([]string{}, dirs...) // copy dirs into a fresh slice
+	all = append(all, files...)        // append files without mutating originals
+	sort.Strings(all)
+	final = append(final, all...) // append alphabetical fallback for dirs/files
 
 	return utils.DedupPreserve(final)
 }

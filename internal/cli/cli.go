@@ -30,14 +30,18 @@ func Parse(version string, args []string) (Config, error) {
 		Short("v").
 		Value()
 	fs.BoolVar(&cfg.NoGitIgnore, "no-gitignore", false, "Disable .gitignore processing.").
+		Short("g").
 		Value()
 	fs.BoolVar(&cfg.IncludeDot, "include-dot", false, "Include hidden files and directories.").
+		Short("i").
 		Value()
 
 	fs.BoolVar(&cfg.NoDirSlash, "no-dir-slash", false, "Disable trailing slash for directory resources.").
+		Short("D").
 		Value()
 
 	fs.BoolVar(&cfg.NoDirFirst, "no-dir-first", false, "Disable directory-first sorting.").
+		Short("F").
 		Value()
 
 	if err := fs.Parse(args); err != nil {

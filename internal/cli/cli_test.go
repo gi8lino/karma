@@ -10,22 +10,55 @@ import (
 func TestParse(t *testing.T) {
 	t.Parallel()
 
-	cfg, err := Parse("1.0.0", []string{
-		"-s", ".img,dashboards",
-		"-s", "patch-*",
-		"-v",
-		"--no-gitignore",
-		"--include-dot",
-		"--no-dir-slash",
-		"--no-dir-first",
-		"foo",
+	t.Run("full options", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := Parse("1.0.0", []string{
+			"-s", ".img,dashboards",
+			"-s", "patch-*",
+			"-v",
+			"--no-gitignore",
+			"--include-dot",
+			"--no-dir-slash",
+			"--no-dir-first",
+			"foo",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"foo"}, cfg.BaseDirs)
+		assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
+		assert.Equal(t, 1, cfg.Verbosity)
+		require.True(t, cfg.NoGitIgnore)
+		require.True(t, cfg.IncludeDot)
+		require.True(t, cfg.NoDirSlash)
+		require.True(t, cfg.NoDirFirst)
 	})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"foo"}, cfg.BaseDirs)
-	assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
-	assert.Equal(t, 1, cfg.Verbosity)
-	assert.True(t, cfg.NoGitIgnore)
-	assert.True(t, cfg.IncludeDot)
-	assert.True(t, cfg.NoDirSlash)
-	assert.True(t, cfg.NoDirFirst)
+
+	t.Run("defaults", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := Parse("1.0.0", []string{"bar"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"bar"}, cfg.BaseDirs)
+		assert.Equal(t, []string{}, cfg.SkipPatterns)
+		assert.Zero(t, cfg.Verbosity)
+		require.False(t, cfg.NoGitIgnore)
+		require.False(t, cfg.IncludeDot)
+		require.False(t, cfg.NoDirSlash)
+		require.False(t, cfg.NoDirFirst)
+	})
+
+	t.Run("missing positional", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := Parse("1.0.0", []string{})
+		require.Error(t, err)
+	})
+
+	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := Parse("1.0.0", []string{"--help"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Usage")
+	})
 }

@@ -3,6 +3,9 @@ project_name: kustomizer
 before:
   hooks:
     - go mod tidy
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
 builds:
   - main: ./cmd/kustomizer/main.go
     env:
@@ -10,10 +13,10 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
-      - arm
     ldflags:
       - -s -w
       - -X main.Version={{ .Tag }}

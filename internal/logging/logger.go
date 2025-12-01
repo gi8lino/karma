@@ -3,6 +3,7 @@ package logging
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 const (
@@ -154,15 +155,16 @@ func (l *Logger) write(tag string, kv []string) {
 	if target == nil {
 		return
 	}
-	fmt.Fprintf(target, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck
 	for i := 0; i < len(kv); i += 2 {
 		if i+1 < len(kv) {
-			fmt.Fprintf(target, " %s=%s", kv[i], kv[i+1]) // nolint:errcheck
-		} else {
-			fmt.Fprintf(target, " %s", kv[i]) // nolint:errcheck
+			fmt.Fprintf(&b, " %s=%s", kv[i], kv[i+1]) // nolint:errcheck
+			continue
 		}
+		fmt.Fprintf(&b, " %s", kv[i]) // nolint:errcheck
 	}
-	fmt.Fprintln(target) // nolint:errcheck
+	fmt.Fprintln(target, b.String()) // nolint:errcheck
 }
 
 func resourceBlockLines(entries []string) []string {

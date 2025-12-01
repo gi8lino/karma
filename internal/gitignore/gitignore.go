@@ -10,15 +10,17 @@ import (
 
 // Matcher decides if a path is ignored based on stacked rules.
 type Matcher interface {
+	// Ignored reports whether the given path matches any loaded patterns.
 	Ignored(fullPath string, isDir bool) bool
+	// Child loads or reuses the matcher for a subdirectory.
 	Child(dir string) (Matcher, error)
 }
 
 type matcher struct {
-	dir      string
-	parent   *matcher
-	patterns []string
-	children map[string]*matcher
+	dir      string              // directory that owns this matcher.
+	parent   *matcher            // parent matcher to inherit patterns.
+	patterns []string            // collected patterns from this directory.
+	children map[string]*matcher // cached child matchers.
 }
 
 // Load creates a matcher rooted at dir; returns nil if useGitignore is false.
@@ -35,6 +37,8 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 		parent:   parent,
 		children: make(map[string]*matcher),
 	}
+
+	// load the .gitignore file if it exists.
 	path := filepath.Join(dir, ".gitignore")
 	file, err := os.Open(path)
 	if err != nil {
@@ -45,9 +49,11 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 	}
 	defer file.Close() // nolint:errcheck
 
+	// parse the file into patterns.
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		// skip empty lines and comments.
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -60,20 +66,27 @@ func (m *matcher) Ignored(fullPath string, isDir bool) bool {
 	if m == nil {
 		return false
 	}
+
+	// compute the relative path to the matcher.
 	rel, err := filepath.Rel(m.dir, fullPath)
 	if err != nil {
 		return m.parent.Ignored(fullPath, isDir)
 	}
+
+	// normalize the relative path to a slash-separated string.
 	rel = filepath.ToSlash(rel)
 	if rel == "." {
 		rel = ""
 	}
 
 	for _, pattern := range m.patterns {
+		// short-circuit when a pattern matches the relative path.
 		if matchesPattern(rel, pattern, isDir) {
 			return true
 		}
 	}
+
+	// recurse into the parent matcher if we have one.
 	if m.parent != nil {
 		return m.parent.Ignored(fullPath, isDir)
 	}
@@ -84,17 +97,23 @@ func (m *matcher) Child(dir string) (Matcher, error) {
 	if m == nil {
 		return newMatcher(dir, nil)
 	}
+
+	// reuse existing child matchers.
 	if child, ok := m.children[dir]; ok {
 		return child, nil
 	}
+
+	// create a new child matcher.
 	child, err := newMatcher(dir, m)
 	if err != nil {
 		return nil, err
 	}
 	m.children[dir] = child
+
 	return child, nil
 }
 
+// matchesPattern reports whether rel matches the pattern.
 func matchesPattern(rel, pattern string, isDir bool) bool {
 	if pattern == "" {
 		return false
