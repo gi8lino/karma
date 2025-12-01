@@ -35,15 +35,16 @@ func parseSkipRules(patterns []string) []skipRule {
 	rules := make([]skipRule, 0, len(patterns))
 	for _, raw := range patterns {
 		rule := skipRule{raw: raw}
+		canonical := strings.TrimRight(raw, "/")
 		switch {
-		case strings.HasSuffix(raw, "/**"):
+		case strings.HasSuffix(canonical, "/**"):
 			// keep directories but skip their own kustomization.
 			rule.mode = skipModeSubtree
-			rule.value = strings.TrimSuffix(raw, "/**")
+			rule.value = strings.TrimSuffix(canonical, "/**")
 		case strings.HasSuffix(raw, "/*"):
 			// skip immediate children but keep the parent listed.
 			rule.mode = skipModeChildren
-			rule.value = strings.TrimSuffix(raw, "/*")
+			rule.value = strings.TrimSuffix(canonical, "/*")
 		case strings.ContainsAny(raw, "*?[]"):
 			// treat glob patterns as direct skip rules.
 			rule.mode = skipModeGlob
@@ -63,8 +64,8 @@ func matchSkip(rel string, isDir bool, rules []skipRule) (skip bool, mode skipMo
 	for _, rule := range rules {
 		switch rule.mode {
 		case skipModeSubtree:
-			// subtree skips cover everything below the prefix.
-			if matchesPrefix(rel, rule.value) {
+			// subtree skips only affect the directory itself, so children can still be processed.
+			if rel == rule.value {
 				return true, skipModeSubtree, rule.raw
 			}
 		case skipModeChildren:
@@ -123,19 +124,6 @@ func handleSkipDir(entry os.DirEntry, mode skipMode, dirEntries []string, childD
 		// fallback for unknown modes, keep the current lists unchanged.
 		return dirEntries, childDirs
 	}
-}
-
-// matchesPrefix reports whether rel lives inside prefix.
-func matchesPrefix(rel, prefix string) bool {
-	if prefix == "" {
-		return true
-	}
-	// treat the prefix as matching itself before falling back to HasPrefix.
-	if rel == prefix {
-		return true
-	}
-
-	return strings.HasPrefix(rel, prefix+"/")
 }
 
 // matchesChild reports whether rel is a direct child of prefix.

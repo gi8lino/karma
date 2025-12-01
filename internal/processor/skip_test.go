@@ -8,24 +8,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type dirEntryStub struct {
+	name string
+}
+
+func (d dirEntryStub) Name() string               { return d.name }
+func (d dirEntryStub) IsDir() bool                { return true }
+func (d dirEntryStub) Type() os.FileMode          { return os.ModeDir }
+func (d dirEntryStub) Info() (os.FileInfo, error) { return nil, nil }
+
 func TestMatchSkipModes(t *testing.T) {
 	t.Parallel()
 
 	t.Run("subtree", func(t *testing.T) {
+		t.Parallel()
 		rules := parseSkipRules([]string{"flux/config/**"})
-		ok, mode, _ := matchSkip("flux/config/nested", true, rules)
+		ok, mode, _ := matchSkip("flux/config", true, rules)
 		require.True(t, ok)
 		assert.Equal(t, skipModeSubtree, mode)
 	})
 
+	t.Run("subtreeDoesNotSkipDescendants", func(t *testing.T) {
+		t.Parallel()
+		rules := parseSkipRules([]string{"apps/debug/**"})
+		skip, _, _ := matchSkip("apps/debug/nested", true, rules)
+		assert.False(t, skip)
+	})
+
 	t.Run("children", func(t *testing.T) {
+		t.Parallel()
 		rules := parseSkipRules([]string{"flux/config/*"})
 		ok, mode, _ := matchSkip("flux/config/child", true, rules)
 		require.True(t, ok)
 		assert.Equal(t, skipModeChildren, mode)
 	})
 
+	t.Run("subtreeWithTrailingSlash", func(t *testing.T) {
+		t.Parallel()
+		rules := parseSkipRules([]string{"apps/debug/**/"})
+		ok, mode, _ := matchSkip("apps/debug", true, rules)
+		require.True(t, ok)
+		assert.Equal(t, skipModeSubtree, mode)
+	})
+
 	t.Run("glob", func(t *testing.T) {
+		t.Parallel()
 		rules := parseSkipRules([]string{"flux/*.yaml"})
 		ok, mode, _ := matchSkip("flux/sample.yaml", false, rules)
 		require.True(t, ok)
@@ -33,6 +60,7 @@ func TestMatchSkipModes(t *testing.T) {
 	})
 
 	t.Run("exact", func(t *testing.T) {
+		t.Parallel()
 		rules := parseSkipRules([]string{"README"})
 		ok, mode, _ := matchSkip("README", false, rules)
 		require.True(t, ok)
@@ -44,36 +72,49 @@ func TestHandleSkipDir(t *testing.T) {
 	t.Parallel()
 
 	entry := dirEntryStub{name: "flux/config"}
-	dirEntries, childDirs := handleSkipDir(entry, skipModeChildren, nil, nil)
-	assert.Equal(t, []string{"flux/config"}, dirEntries)
-	require.Len(t, childDirs, 1)
-	assert.True(t, childDirs[0].skipWalk)
 
-	dirEntries, childDirs = handleSkipDir(entry, skipModeSubtree, nil, nil)
-	assert.Equal(t, []string{"flux/config"}, dirEntries)
-	require.Len(t, childDirs, 1)
-	assert.True(t, childDirs[0].skipUpdate)
+	t.Run("childrenModeKeepsDirAndSkipsWalk", func(t *testing.T) {
+		t.Parallel()
 
-	dirEntries, childDirs = handleSkipDir(entry, skipModeExact, []string{"foo"}, nil)
-	assert.Equal(t, []string{"foo"}, dirEntries)
-	assert.Len(t, childDirs, 0)
+		dirEntries, childDirs := handleSkipDir(entry, skipModeChildren, nil, nil)
+		assert.Equal(t, []string{"flux/config"}, dirEntries)
+		require.Len(t, childDirs, 1)
+		assert.True(t, childDirs[0].skipWalk)
+	})
+
+	t.Run("subtreeModeKeepsDirAndSkipsUpdate", func(t *testing.T) {
+		t.Parallel()
+
+		dirEntries, childDirs := handleSkipDir(entry, skipModeSubtree, nil, nil)
+		assert.Equal(t, []string{"flux/config"}, dirEntries)
+		require.Len(t, childDirs, 1)
+		assert.True(t, childDirs[0].skipUpdate)
+	})
+
+	t.Run("exactModeDropsDirectory", func(t *testing.T) {
+		t.Parallel()
+
+		dirEntries, childDirs := handleSkipDir(entry, skipModeExact, []string{"foo"}, nil)
+		assert.Equal(t, []string{"foo"}, dirEntries)
+		assert.Len(t, childDirs, 0)
+	})
 }
 
 func TestMatchesPrefixAndChild(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, matchesPrefix("flux/config/app", "flux/config"))
-	assert.False(t, matchesPrefix("flux/config", "flux/config/app"))
-	assert.True(t, matchesChild("flux/config/app", "flux/config"))
-	assert.False(t, matchesChild("flux/config/app/sub", "flux/config"))
-	assert.True(t, matchesChild("app", ""))
-}
+	t.Run("childMatchesDirectDescendant", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, matchesChild("flux/config/app", "flux/config"))
+	})
 
-type dirEntryStub struct {
-	name string
-}
+	t.Run("childDoesNotMatchNestedMoreThanOneLevel", func(t *testing.T) {
+		t.Parallel()
+		assert.False(t, matchesChild("flux/config/app/sub", "flux/config"))
+	})
 
-func (d dirEntryStub) Name() string               { return d.name }
-func (d dirEntryStub) IsDir() bool                { return true }
-func (d dirEntryStub) Type() os.FileMode          { return os.ModeDir }
-func (d dirEntryStub) Info() (os.FileInfo, error) { return nil, nil }
+	t.Run("childMatchesRootWithSimpleName", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, matchesChild("app", ""))
+	})
+}
