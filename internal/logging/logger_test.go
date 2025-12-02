@@ -15,7 +15,7 @@ func stripANSI(t *testing.T, input string) string {
 	return re.ReplaceAllString(input, "")
 }
 
-func TestProcessingLogsWithLevel(t *testing.T) {
+func TestProcessing(t *testing.T) {
 	t.Parallel()
 
 	t.Run("processing", func(t *testing.T) {
@@ -88,6 +88,21 @@ func TestDebug(t *testing.T) {
 		logger := New(out, nil, LevelDebug)
 		logger.Debug("details", "foo", "bar")
 		assert.Contains(t, stripANSI(t, out.String()), "[DEBUG   ]")
+	})
+}
+
+func TestDebugKV(t *testing.T) {
+	t.Parallel()
+
+	t.Run("kv only", func(t *testing.T) {
+		t.Parallel()
+		buf := &bytes.Buffer{}
+		logger := New(buf, nil, LevelDebug)
+		logger.DebugKV("foo", "bar", "baz", "qux")
+		got := stripANSI(t, buf.String())
+		assert.Contains(t, got, "foo=bar")
+		assert.Contains(t, got, "baz=qux")
+		assert.NotContains(t, got, "message=")
 	})
 }
 

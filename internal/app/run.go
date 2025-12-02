@@ -26,11 +26,14 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 	logLevel := logging.LevelFromVerbosity(cfg.Verbosity)
 	logger := logging.New(stdOut, stdErr, logLevel)
 
-	logger.Debug("settings", "version", version)
-	logger.Debug("settings", "skip", fmt.Sprintf("%v", cfg.SkipPatterns))
-	logger.Debug("settings", "no-gitignore", fmt.Sprintf("%v", cfg.NoGitIgnore))
-	logger.Debug("settings", "include-dot", fmt.Sprintf("%v", cfg.IncludeDot))
-	logger.Debug("settings", "order", fmt.Sprintf("%v", cfg.ResourceOrder))
+	logger.DebugKV("version", version)
+	logger.DebugKV(
+		"skip", fmt.Sprintf("%v", cfg.SkipPatterns),
+		"no-gitignore", fmt.Sprintf("%v", cfg.NoGitIgnore),
+		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
+		"dir-slash", fmt.Sprintf("%v", cfg.NoDirSlash),
+		"order", fmt.Sprintf("%v", cfg.ResourceOrder),
+	)
 
 	opts := processor.Options{
 		Skip:          cfg.SkipPatterns,

@@ -110,6 +110,13 @@ func (l *Logger) Debug(msg string, kv ...string) {
 	})
 }
 
+// DebugKV logs debug-level key/value pairs without a message prefix.
+func (l *Logger) DebugKV(kv ...string) {
+	l.log(l.out, LevelDebug, "DEBUG", func() []string {
+		return kv
+	})
+}
+
 // Trace logs trace-level output when the log level permits.
 func (l *Logger) Trace(msg string, kv ...string) {
 	l.log(l.out, LevelTrace, "TRACE", func() []string {
