@@ -41,7 +41,7 @@ func Parse(version string, args []string) (Config, error) {
 		Short("i").
 		Value()
 	allowed := strings.Join(processor.DefaultResourceOrder(), ", ")
-	order := fs.String("order", allowed, fmt.Sprintf("Order resource groups. Allowed: %s.", allowed)).
+	order := fs.String("order", allowed, fmt.Sprintf("Build the resource groups in the provided order. Valid groups: %s.", allowed)).
 		Validate(func(v string) error {
 			dro := processor.DefaultResourceOrder()
 			for _, item := range strings.Split(v, ",") {
@@ -54,6 +54,8 @@ func Parse(version string, args []string) (Config, error) {
 			}
 			return nil
 		}).
+		Placeholder(strings.Join(processor.DefaultResourceOrder(), ",")).
+		HideDefault().
 		Value()
 
 	// formatting
@@ -62,8 +64,9 @@ func Parse(version string, args []string) (Config, error) {
 		Value()
 
 	// logging
-	fs.CounterVar(&cfg.Verbosity, "verbose", 0, "Increase verbosity.").
+	fs.CounterVar(&cfg.Verbosity, "verbose", 0, "Increase verbosity. Repeat to show more details.").
 		Short("v").
+		HideDefault().
 		OneOfGroup("logging").
 		Value()
 	fs.BoolVar(&cfg.Mute, "mute", false, "Suppress all output.").
