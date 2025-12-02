@@ -306,7 +306,7 @@ func diffEntries(old, new []string) (added, removed []string) {
 
 	for entry, count := range counts {
 		// anything left in counts was removed.
-		for i := 0; i < count; i++ {
+		for range count {
 			removed = append(removed, entry)
 		}
 	}
@@ -518,10 +518,8 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 
 // mergeResources produces the canonical ordering for resources.
 func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []string) []string {
-	// create a copy of the existing resources.
-	dirs := append([]string(nil), dirEntries...)
-	files := append([]string(nil), fileEntries...)
-	dirs = p.decorateSubdirs(dirs)
+	dirs := p.decorateSubdirs(dirEntries)
+	files := append([]string(nil), fileEntries...) // create a copy of the existing resources.
 
 	sort.Strings(dirs)
 	sort.Strings(files)
@@ -559,11 +557,8 @@ func (p *Processor) decorateSubdirs(subdirs []string) []string {
 	}
 	out := make([]string, 0, len(subdirs))
 	for _, s := range subdirs {
-		if trimmed, ok := strings.CutSuffix(s, "/"); ok {
-			out = append(out, trimmed+"/")
-			continue
-		}
-		out = append(out, s+"/")
+		trimmed, _ := strings.CutSuffix(s, "/")
+		out = append(out, trimmed+"/")
 	}
 	return out
 }
