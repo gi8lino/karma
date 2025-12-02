@@ -81,4 +81,18 @@ func TestParse(t *testing.T) {
 		assert.True(t, cfg.Mute)
 		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
+
+	t.Run("wrong order flag", func(t *testing.T) {
+		t.Parallel()
+		_, err := Parse("1.0.0", []string{"--order", "foo"})
+		require.Error(t, err)
+		assert.EqualError(t, err, "invalid value for flag --order: invalid resource order item: foo. allowed are: remote, dirs, files.")
+	})
+
+	t.Run("empty order flag", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"--order", "files,dirs,,remote", "positional"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"files", "dirs", "remote"}, cfg.ResourceOrder)
+	})
 }

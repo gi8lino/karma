@@ -64,9 +64,5 @@ func normalizeResourceOrder(parts []string) []string {
 		out = append(out, group)
 	}
 
-	if len(out) == 0 {
-		return DefaultResourceOrder()
-	}
-
 	return out
 }

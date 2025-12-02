@@ -3,6 +3,7 @@ package gitignore
 import (
 	"bufio"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,16 +51,12 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 	defer file.Close() // nolint:errcheck
 
 	// parse the file into patterns.
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// skip empty lines and comments.
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		m.patterns = append(m.patterns, line)
+	patterns, err := parseGitignore(file)
+	if err != nil {
+		return nil, err
 	}
-	return m, scanner.Err()
+	m.patterns = patterns
+	return m, nil
 }
 
 func (m *matcher) Ignored(fullPath string, isDir bool) bool {
@@ -111,6 +108,20 @@ func (m *matcher) Child(dir string) (Matcher, error) {
 	m.children[dir] = child
 
 	return child, nil
+}
+
+// matchesPattern reports whether rel matches the pattern.
+func parseGitignore(r io.Reader) ([]string, error) {
+	scanner := bufio.NewScanner(r)
+	var patterns []string
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, line)
+	}
+	return patterns, scanner.Err()
 }
 
 // matchesPattern reports whether rel matches the pattern.

@@ -27,7 +27,7 @@ func TestProcessingLogsWithLevel(t *testing.T) {
 	})
 }
 
-func TestSkippingLogsWhenEnabled(t *testing.T) {
+func TestSkipping(t *testing.T) {
 	t.Parallel()
 
 	t.Run("skipping", func(t *testing.T) {
@@ -37,9 +37,17 @@ func TestSkippingLogsWhenEnabled(t *testing.T) {
 		logger.Skipped("path", "flux/config")
 		assert.Contains(t, stripANSI(t, out.String()), "[SKIPPING]")
 	})
+
+	t.Run("no skip at info", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelInfo)
+		logger.Skipped("path", "flux/config")
+		assert.Empty(t, stripANSI(t, out.String()))
+	})
 }
 
-func TestUpdatedLogsAlways(t *testing.T) {
+func TestUpdated(t *testing.T) {
 	t.Parallel()
 
 	t.Run("updated", func(t *testing.T) {
@@ -51,7 +59,7 @@ func TestUpdatedLogsAlways(t *testing.T) {
 	})
 }
 
-func TestNoOpLogsWithLevel(t *testing.T) {
+func TestNoOp(t *testing.T) {
 	t.Parallel()
 
 	t.Run("noop", func(t *testing.T) {
@@ -60,18 +68,6 @@ func TestNoOpLogsWithLevel(t *testing.T) {
 		logger := New(out, nil, LevelDebug)
 		logger.NoOp("/tmp/kustomization.yaml")
 		assert.Contains(t, stripANSI(t, out.String()), "[NO-OP   ]")
-	})
-}
-
-func TestSkippingAndNoOpHiddenAtLowerLevel(t *testing.T) {
-	t.Parallel()
-
-	t.Run("no skip at info", func(t *testing.T) {
-		t.Parallel()
-		out := &bytes.Buffer{}
-		logger := New(out, nil, LevelInfo)
-		logger.Skipped("path", "flux/config")
-		assert.Empty(t, stripANSI(t, out.String()))
 	})
 
 	t.Run("no noop at verbose", func(t *testing.T) {
@@ -83,7 +79,7 @@ func TestSkippingAndNoOpHiddenAtLowerLevel(t *testing.T) {
 	})
 }
 
-func TestDebugLogsWhenVerbose(t *testing.T) {
+func TestDebug(t *testing.T) {
 	t.Parallel()
 
 	t.Run("debug", func(t *testing.T) {
@@ -95,7 +91,7 @@ func TestDebugLogsWhenVerbose(t *testing.T) {
 	})
 }
 
-func TestTraceLogsWhenTraceLevel(t *testing.T) {
+func TestTrace(t *testing.T) {
 	t.Parallel()
 
 	t.Run("trace", func(t *testing.T) {
@@ -107,7 +103,7 @@ func TestTraceLogsWhenTraceLevel(t *testing.T) {
 	})
 }
 
-func TestSummaryAlwaysLogs(t *testing.T) {
+func TestSummary(t *testing.T) {
 	t.Parallel()
 
 	t.Run("summary", func(t *testing.T) {
@@ -119,7 +115,7 @@ func TestSummaryAlwaysLogs(t *testing.T) {
 	})
 }
 
-func TestErrorLogsToErrWriter(t *testing.T) {
+func TestError(t *testing.T) {
 	t.Parallel()
 
 	t.Run("error", func(t *testing.T) {
@@ -131,27 +127,32 @@ func TestErrorLogsToErrWriter(t *testing.T) {
 	})
 }
 
-func TestResourceDiffShowsChanges(t *testing.T) {
+func TestResourceDiff(t *testing.T) {
 	t.Parallel()
 
-	t.Run("resource diff", func(t *testing.T) {
+	t.Run("diffs", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelVerbose)
-		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
+		logger.ResourceDiff([]string{"app", "old"}, []string{"app", "new"})
 		stripped := stripANSI(t, out.String())
 		require.Contains(t, stripped, "+  - \"new\"")
+		require.Contains(t, stripped, "-  - \"old\"")
 	})
-}
-
-func TestResourceDiffSkipWhenNoChange(t *testing.T) {
-	t.Parallel()
 
 	t.Run("no change", func(t *testing.T) {
 		t.Parallel()
 		out := &bytes.Buffer{}
+		logger := New(out, nil, LevelVerbose)
+		logger.ResourceDiff([]string{}, []string{})
+		require.Empty(t, out.String())
+	})
+
+	t.Run("info level hides diff", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)
-		logger.ResourceDiff([]string{"app"}, []string{"app"})
+		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
 		assert.Empty(t, stripANSI(t, out.String()))
 	})
 }
@@ -185,13 +186,45 @@ func TestLevelFromVerbosity(t *testing.T) {
 	})
 }
 
-func TestResourceDiffHiddenAtInfo(t *testing.T) {
+func TestDiffStrings(t *testing.T) {
 	t.Parallel()
-	t.Run("info level hides diff", func(t *testing.T) {
+
+	t.Run("detects added and removed", func(t *testing.T) {
 		t.Parallel()
-		out := &bytes.Buffer{}
-		logger := New(out, nil, LevelInfo)
-		logger.ResourceDiff([]string{"app"}, []string{"app", "new"})
-		assert.Empty(t, stripANSI(t, out.String()))
+		removed, added := diffStrings([]string{"a", "b"}, []string{"b", "c"})
+		assert.Equal(t, []string{"a"}, removed)
+		assert.Equal(t, []string{"c"}, added)
+	})
+
+	t.Run("respects duplicates", func(t *testing.T) {
+		t.Parallel()
+		removed, added := diffStrings([]string{"a", "a", "b"}, []string{"a", "c", "a"})
+		assert.ElementsMatch(t, []string{"b"}, removed)
+		assert.ElementsMatch(t, []string{"c"}, added)
+	})
+}
+
+func TestWrite(t *testing.T) {
+	t.Parallel()
+
+	t.Run("even key values", func(t *testing.T) {
+		t.Parallel()
+		buf := &bytes.Buffer{}
+		logger := New(nil, nil, LevelInfo)
+		logger.write(buf, "UPDATED", []string{"kustomization", "/tmp/kustomization.yaml"})
+		got := stripANSI(t, buf.String())
+		assert.Contains(t, got, "[UPDATED ]")
+		assert.Contains(t, got, "kustomization=/tmp/kustomization.yaml")
+	})
+
+	t.Run("odd key list writes bare value", func(t *testing.T) {
+		t.Parallel()
+		buf := &bytes.Buffer{}
+		logger := New(nil, nil, LevelInfo)
+		logger.write(buf, "SUMMARY", []string{"updated", "1", "no-op"})
+		got := stripANSI(t, buf.String())
+		assert.Contains(t, got, "[SUMMARY ]")
+		assert.Contains(t, got, "updated=1")
+		assert.Contains(t, got, "no-op")
 	})
 }
