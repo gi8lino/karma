@@ -19,7 +19,6 @@ func TestParse(t *testing.T) {
 			"--no-gitignore",
 			"--include-dot",
 			"--no-dir-slash",
-			"--no-dir-first",
 			"-q",
 			"foo",
 		})
@@ -29,7 +28,6 @@ func TestParse(t *testing.T) {
 		require.True(t, cfg.NoGitIgnore)
 		require.True(t, cfg.IncludeDot)
 		require.True(t, cfg.NoDirSlash)
-		require.True(t, cfg.NoDirFirst)
 		require.True(t, cfg.Mute)
 		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
@@ -52,7 +50,14 @@ func TestParse(t *testing.T) {
 		require.False(t, cfg.NoGitIgnore)
 		require.False(t, cfg.IncludeDot)
 		require.False(t, cfg.NoDirSlash)
-		require.False(t, cfg.NoDirFirst)
+	})
+
+	t.Run("order flag", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"--order", "remote,files,dirs", "foo"})
+		require.NoError(t, err)
+		t.Logf("order flag set to %q resource order %v", cfg.Order, cfg.ResourceOrder)
+		require.Equal(t, []string{"remote", "files", "dirs"}, cfg.ResourceOrder)
 	})
 
 	t.Run("missing positional", func(t *testing.T) {

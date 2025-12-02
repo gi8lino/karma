@@ -19,11 +19,11 @@ import (
 
 // Options describe how the processor behaves for each tree.
 type Options struct {
-	Skip         []string
-	UseGitIgnore bool
-	IncludeDot   bool
-	DirSlash     bool
-	DirFirst     bool
+	Skip          []string
+	UseGitIgnore  bool
+	IncludeDot    bool
+	DirSlash      bool
+	ResourceOrder []string
 }
 
 type ResourceStats struct {
@@ -518,9 +518,9 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 
 // mergeResources produces the canonical ordering for resources.
 func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []string) []string {
-	// deduplicate and prepare the directory/file slices.
-	dirs := utils.DedupPreserve(dirEntries)
-	files := utils.DedupPreserve(fileEntries)
+	// create a copy of the existing resources.
+	dirs := append([]string(nil), dirEntries...)
+	files := append([]string(nil), fileEntries...)
 	dirs = p.decorateSubdirs(dirs)
 
 	sort.Strings(dirs)
@@ -535,20 +535,22 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	}
 	sort.Strings(remote)
 
-	// assemble final ordering respecting dir-first flag.
-	final := make([]string, 0, len(remote)+len(dirs)+len(files))
-	final = append(final, remote...)
-
-	if p.opts.DirFirst {
-		final = append(final, dirs...)  // copy dirs into a fresh slice
-		final = append(final, files...) // append a copy of files
-		return utils.DedupPreserve(final)
+	order := defaultResourceOrder
+	if len(p.opts.ResourceOrder) > 0 {
+		order = p.opts.ResourceOrder
 	}
 
-	all := append([]string{}, dirs...) // copy dirs into a fresh slice
-	all = append(all, files...)        // append files without mutating originals
-	sort.Strings(all)
-	final = append(final, all...) // append alphabetical fallback for dirs/files
+	final := make([]string, 0, len(remote)+len(dirs)+len(files))
+	for _, group := range order {
+		switch group {
+		case resourceGroupRemote:
+			final = append(final, remote...)
+		case resourceGroupDirs:
+			final = append(final, dirs...)
+		case resourceGroupFiles:
+			final = append(final, files...)
+		}
+	}
 
 	return utils.DedupPreserve(final)
 }

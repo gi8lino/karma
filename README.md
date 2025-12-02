@@ -14,10 +14,10 @@ karma [options] <base-dir>...
 - `-v` – Increase verbosity to show resource diffs.
 - `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
 - `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.
+- `--order` – Customize the ordering of remote, directory, and file groups (default `remote,dirs,files`).
 - `--no-gitignore`, `-g` – Disable per-directory `.gitignore` evaluation.
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--no-dir-slash`, `-D` – Keep directory resources without a trailing slash.
-- `--no-dir-first`, `-F` – Disable directory-first ordering.
 
 ## Logging
 

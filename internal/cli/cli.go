@@ -1,19 +1,24 @@
 package cli
 
 import (
+	"fmt"
+	"slices"
+	"strings"
+
 	"github.com/containeroo/tinyflags"
+	"github.com/gi8lino/karma/internal/processor"
 )
 
 // Config holds parsed command-line options.
 type Config struct {
-	BaseDirs     []string
-	SkipPatterns []string
-	Verbosity    int
-	NoDirSlash   bool
-	NoDirFirst   bool
-	NoGitIgnore  bool
-	IncludeDot   bool
-	Mute         bool
+	BaseDirs      []string
+	SkipPatterns  []string
+	Verbosity     int
+	NoDirSlash    bool
+	NoGitIgnore   bool
+	IncludeDot    bool
+	Mute          bool
+	ResourceOrder []string
 }
 
 // Parse builds user configuration from CLI args.
@@ -21,7 +26,7 @@ func Parse(version string, args []string) (Config, error) {
 	fs := tinyflags.NewFlagSet("karma", tinyflags.ContinueOnError)
 	fs.Version(version)
 	fs.RequirePositional(1)
-	fs.Note("\n*) skip supports `*` wildcards, `/*` to skip a directory's kustomization without entering it, and `/**` to skip the kustomization but still descend into its children (so those nested dirs can still be handled separately).")
+	fs.Note("*) skip accepts `*` wildcards plus `/*` to ignore a directory's contents and `/**` to ignore the directory while still descending into its children.")
 
 	cfg := Config{}
 
@@ -35,13 +40,25 @@ func Parse(version string, args []string) (Config, error) {
 	fs.BoolVar(&cfg.IncludeDot, "include-dot", false, "Include hidden files and directories.").
 		Short("i").
 		Value()
+	allowed := strings.Join(processor.DefaultResourceOrder(), ", ")
+	order := fs.String("order", allowed, fmt.Sprintf("Order resource groups. Allowed: %s.", allowed)).
+		Validate(func(v string) error {
+			dro := processor.DefaultResourceOrder()
+			for _, item := range strings.Split(v, ",") {
+				if item == "" {
+					continue
+				}
+				if !slices.Contains(dro, item) {
+					return fmt.Errorf("invalid resource order item: %s. allowed are: %s", item, allowed)
+				}
+			}
+			return nil
+		}).
+		Value()
 
 	// formatting
 	fs.BoolVar(&cfg.NoDirSlash, "no-dir-slash", false, "Disable trailing slash for directory resources.").
 		Short("D").
-		Value()
-	fs.BoolVar(&cfg.NoDirFirst, "no-dir-first", false, "Disable directory-first sorting.").
-		Short("F").
 		Value()
 
 	// logging
@@ -65,6 +82,7 @@ func Parse(version string, args []string) (Config, error) {
 	}
 
 	cfg.BaseDirs = fs.Args()
+	cfg.ResourceOrder = processor.ParseResourceOrder(*order)
 
 	return cfg, nil
 }
