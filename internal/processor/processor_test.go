@@ -175,7 +175,6 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - existing\n"), 0o644))
 		proc := New(Options{DirSlash: true, ResourceOrder: []string{"remote", "dirs"}}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
-
 		updated, order, final, stats, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
 		require.NoError(t, err)
 		assert.True(t, updated)

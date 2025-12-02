@@ -535,10 +535,7 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	}
 	sort.Strings(remote)
 
-	order := defaultResourceOrder
-	if len(p.opts.ResourceOrder) > 0 {
-		order = p.opts.ResourceOrder
-	}
+	order := normalizeResourceOrder(p.opts.ResourceOrder)
 
 	final := make([]string, 0, len(remote)+len(dirs)+len(files))
 	for _, group := range order {

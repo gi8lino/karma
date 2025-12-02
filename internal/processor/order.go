@@ -24,14 +24,22 @@ func DefaultResourceOrder() []string {
 // ParseResourceOrder builds a resource group order from the provided CSV, appending missing groups.
 func ParseResourceOrder(value string) []string {
 	if strings.TrimSpace(value) == "" {
-		return defaultResourceOrder
+		return DefaultResourceOrder()
+	}
+	return normalizeResourceOrder(strings.Split(value, ","))
+}
+
+// normalizeResourceOrder normalizes the provided resource ordering.
+func normalizeResourceOrder(parts []string) []string {
+	if len(parts) == 0 {
+		return DefaultResourceOrder()
 	}
 
 	seen := map[string]struct{}{}                       // map for uniqueness
 	out := make([]string, 0, len(defaultResourceOrder)) // slice to keep order
 
 	// parse the provided value and add each group.
-	for _, part := range strings.Split(value, ",") {
+	for _, part := range parts {
 		group := strings.ToLower(strings.TrimSpace(part))
 		if group == "" {
 			continue
@@ -57,7 +65,7 @@ func ParseResourceOrder(value string) []string {
 	}
 
 	if len(out) == 0 {
-		return defaultResourceOrder
+		return DefaultResourceOrder()
 	}
 
 	return out

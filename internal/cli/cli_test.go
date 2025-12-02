@@ -56,7 +56,6 @@ func TestParse(t *testing.T) {
 		t.Parallel()
 		cfg, err := Parse("1.0.0", []string{"--order", "remote,files,dirs", "foo"})
 		require.NoError(t, err)
-		t.Logf("order flag set to %q resource order %v", cfg.Order, cfg.ResourceOrder)
 		require.Equal(t, []string{"remote", "files", "dirs"}, cfg.ResourceOrder)
 	})
 
@@ -82,5 +81,4 @@ func TestParse(t *testing.T) {
 		assert.True(t, cfg.Mute)
 		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
-
 }
