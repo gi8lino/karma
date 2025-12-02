@@ -3,7 +3,7 @@ module github.com/gi8lino/karma
 go 1.25.4
 
 require (
-	github.com/containeroo/tinyflags v0.0.53
+	github.com/containeroo/tinyflags v0.0.54
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
 )
