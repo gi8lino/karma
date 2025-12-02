@@ -434,6 +434,8 @@ func (p *Processor) loadKustomization(
 		root.Content[0].Kind = yaml.MappingNode
 	}
 
+	ensureHeader(root.Content[0])
+
 	seq, order, nodes, err = ensureResourcesSeq(root)
 	return root, seq, order, nodes, err
 }
@@ -469,6 +471,27 @@ func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes 
 
 	nodes, order = collectExistingResources(seq)
 	return seq, order, nodes, err
+}
+
+// ensureHeader injects the canonical header keys at the top when missing.
+func ensureHeader(mapNode *yaml.Node) {
+	// detect if a header already exists; if so, leave it untouched.
+	for i := 0; i < len(mapNode.Content); i += 2 {
+		key := mapNode.Content[i].Value
+		if key == "apiVersion" || key == "kind" {
+			return
+		}
+	}
+
+	header := []*yaml.Node{
+		{Kind: yaml.ScalarNode, Value: "apiVersion", Tag: "!!str"},
+		{Kind: yaml.ScalarNode, Value: "kustomize.config.k8s.io/v1beta1", Tag: "!!str"},
+		{Kind: yaml.ScalarNode, Value: "kind", Tag: "!!str"},
+		{Kind: yaml.ScalarNode, Value: "Kustomization", Tag: "!!str"},
+	}
+
+	// Prepend the header nodes so the header keys appear first in the document.
+	mapNode.Content = append(header, mapNode.Content...)
 }
 
 // collectExistingResources indexes the existing sequence nodes.

@@ -189,6 +189,8 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(data), "added/")
 		assert.Contains(t, string(data), "alpha.yaml")
+		assert.Contains(t, string(data), "apiVersion")
+		assert.Contains(t, string(data), "kind")
 	})
 
 	t.Run("returns false when unchanged", func(t *testing.T) {
@@ -235,7 +237,6 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		assert.Equal(t, 1, stats.Updated)
 		assert.Equal(t, 0, stats.NoOp)
 	})
-
 }
 
 func TestProcessorLoadKustomization(t *testing.T) {

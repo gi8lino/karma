@@ -77,4 +77,5 @@ func TestParse(t *testing.T) {
 		assert.True(t, cfg.Mute)
 		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
+
 }
