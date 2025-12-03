@@ -15,9 +15,11 @@ karma [options] <base-dir>...
 - `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
 - `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.
 - `--order` – Customize the ordering of remote, directory, and file groups (default `remote,dirs,files`).
-- `--no-gitignore`, `-g` – Disable per-directory `.gitignore` evaluation.
+- `--no-gitignore`, `-g` – Disable `.gitignore` processing.
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
-- `--no-dir-slash`, `-D` – Keep directory resources without a trailing slash.
+- `--suffix`, `-x` – Append `/` when listing directories.
+- `--prefix`, `-p` – Prefix directory entries with `./`.
+- `--prefix-ignore` – List prefixes (default `http://`, `https://`, `/`, `./`, `../`) that should remain untouched by the slash/prefix helpers.
 
 ## Logging
 
@@ -36,7 +38,7 @@ karma [options] <base-dir>...
 ## Testing
 
 ```sh
-GOPROXY=off GOSUMDB=off GOCACHE=/tmp/go-build go test ./...
+make test
 ```
 
 ## Releases

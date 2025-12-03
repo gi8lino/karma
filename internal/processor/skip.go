@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// skipMode enumerates how patterns should behave.
+// SkipMode enumerates how patterns should behave.
 type skipMode int
 
 const (
@@ -25,9 +25,9 @@ type skipRule struct {
 
 // childDir carries metadata that controls how we recurse into a directory.
 type childDir struct {
-	name       string // base name of the directory.
-	skipUpdate bool   // true when the child kustomization must remain untouched.
-	skipWalk   bool   // true when we should not recurse into the directory.
+	name       string // Base name of the directory.
+	skipUpdate bool   // True when the child kustomization must remain untouched.
+	skipWalk   bool   // True when recursion into the directory should be skipped.
 }
 
 // parseSkipRules compiles CLI patterns into skipRule entries.
@@ -38,19 +38,19 @@ func parseSkipRules(patterns []string) []skipRule {
 		canonical := strings.TrimRight(raw, "/")
 		switch {
 		case strings.HasSuffix(canonical, "/**"):
-			// keep directories but skip their own kustomization.
+			// Keep directories but skip their own kustomization.
 			rule.mode = skipModeSubtree
 			rule.value = strings.TrimSuffix(canonical, "/**")
 		case strings.HasSuffix(raw, "/*"):
-			// skip immediate children but keep the parent listed.
+			// Skip immediate children but keep the parent listed.
 			rule.mode = skipModeChildren
 			rule.value = strings.TrimSuffix(canonical, "/*")
 		case strings.ContainsAny(raw, "*?[]"):
-			// treat glob patterns as direct skip rules.
+			// Treat glob patterns as direct skip rules.
 			rule.mode = skipModeGlob
 			rule.value = raw
 		default:
-			// plain literal directories or files.
+			// Plain literal directories or files.
 			rule.mode = skipModeExact
 			rule.value = strings.TrimSuffix(raw, "/")
 		}
@@ -64,12 +64,12 @@ func matchSkip(rel string, isDir bool, rules []skipRule) (skip bool, mode skipMo
 	for _, rule := range rules {
 		switch rule.mode {
 		case skipModeSubtree:
-			// subtree skips only affect the directory itself, so children can still be processed.
+			// Subtree skips only affect the directory itself, so children can still be processed.
 			if rel == rule.value {
 				return true, skipModeSubtree, rule.raw
 			}
 		case skipModeChildren:
-			// children skips only apply to immediate descendants.
+			// Children skips only apply to immediate descendants.
 			if isDir && rel == rule.value {
 				return true, skipModeChildren, rule.raw
 			}
@@ -77,22 +77,22 @@ func matchSkip(rel string, isDir bool, rules []skipRule) (skip bool, mode skipMo
 				return true, skipModeChildren, rule.raw
 			}
 		case skipModeExact:
-			// exact matches drop the resource entirely.
+			// Exact matches drop the resource entirely.
 			if rel == rule.value {
 				return true, skipModeExact, rule.raw
 			}
 
-			// match by basename in case the pattern is relative.
+			// Match by basename in case the pattern is relative.
 			if !strings.Contains(rule.value, "/") && path.Base(rel) == rule.value {
 				return true, skipModeExact, rule.raw
 			}
 		case skipModeGlob:
-			// glob patterns work across the full path.
+			// Glob patterns work across the full path.
 			if matched, err := path.Match(rule.value, rel); err == nil && matched {
 				return true, skipModeGlob, rule.raw
 			}
 
-			// also allow glob matches against the basename for non-path patterns.
+			// Also allow glob matches against the basename for non-path patterns.
 			if !strings.Contains(rule.value, "/") {
 				if matched, err := path.Match(rule.value, path.Base(rel)); err == nil && matched {
 					return true, skipModeGlob, rule.raw
@@ -108,20 +108,20 @@ func handleSkipDir(entry os.DirEntry, mode skipMode, dirEntries []string, childD
 	name := entry.Name()
 	switch mode {
 	case skipModeExact:
-		// exact skips drop the directory from the resource list.
+		// Exact skips drop the directory from the resource list.
 		return dirEntries, childDirs
 	case skipModeChildren:
-		// keep directories listed but skip their contents.
+		// Keep directories listed but skip their contents.
 		dirEntries = append(dirEntries, name)
 		childDirs = append(childDirs, childDir{name: name, skipWalk: true})
 		return dirEntries, childDirs
 	case skipModeSubtree:
-		// keep the directory listed but never rewrite its kustomization.
+		// Keep the directory listed but never rewrite its kustomization.
 		dirEntries = append(dirEntries, name)
 		childDirs = append(childDirs, childDir{name: name, skipUpdate: true})
 		return dirEntries, childDirs
 	default:
-		// fallback for unknown modes, keep the current lists unchanged.
+		// Fallback for unknown modes, keep the current lists unchanged.
 		return dirEntries, childDirs
 	}
 }

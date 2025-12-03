@@ -163,7 +163,7 @@ func (l *Logger) ResourceDiff(old, new []string) {
 	}
 }
 
-// diffStrings returns removed and added entries between two slices of resources.
+// DiffStrings returns removed and added entries between two slices of resources.
 func diffStrings(old, new []string) (removed, added []string) {
 	counts := make(map[string]int, len(old))
 
@@ -198,7 +198,7 @@ func diffStrings(old, new []string) (removed, added []string) {
 	return removed, added
 }
 
-// log executes the provided builder when the configured level allows it.
+// Log executes the provided builder when the configured level allows it.
 func (l *Logger) log(w io.Writer, level LogLevel, tag string, builder func() []string) {
 	if level > l.minLevel || builder == nil {
 		return
@@ -207,7 +207,7 @@ func (l *Logger) log(w io.Writer, level LogLevel, tag string, builder func() []s
 	l.write(w, tag, kv)
 }
 
-// write renders a formatted log line to the configured output stream.
+// Write renders a formatted log line to the configured output stream.
 func (l *Logger) write(w io.Writer, tag string, kv []string) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck

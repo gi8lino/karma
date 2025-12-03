@@ -6,6 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDefaultResourceOrder(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns default", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, []string{"remote", "dirs", "files"}, DefaultResourceOrder())
+	})
+}
+
 func TestParseResourceOrder(t *testing.T) {
 	t.Parallel()
 

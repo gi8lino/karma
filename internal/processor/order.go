@@ -35,10 +35,10 @@ func normalizeResourceOrder(parts []string) []string {
 		return DefaultResourceOrder()
 	}
 
-	seen := map[string]struct{}{}                       // map for uniqueness
-	out := make([]string, 0, len(defaultResourceOrder)) // slice to keep order
+	seen := map[string]struct{}{}                       // Map for uniqueness
+	out := make([]string, 0, len(defaultResourceOrder)) // Slice to keep order
 
-	// parse the provided value and add each group.
+	// Parse the provided value and add each group.
 	for _, part := range parts {
 		group := strings.ToLower(strings.TrimSpace(part))
 		if group == "" {
@@ -56,7 +56,7 @@ func normalizeResourceOrder(parts []string) []string {
 		out = append(out, group)
 	}
 
-	// add missing groups at the end.
+	// Add missing groups at the end.
 	for _, group := range defaultResourceOrder {
 		if _, ok := seen[group]; ok {
 			continue

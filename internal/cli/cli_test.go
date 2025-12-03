@@ -18,16 +18,18 @@ func TestParse(t *testing.T) {
 			"-s", "patch-*",
 			"--no-gitignore",
 			"--include-dot",
-			"--no-dir-slash",
+			"--suffix",
+			"--prefix",
+			"--prefix-ignore", "skip",
 			"-q",
 			"foo",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"foo"}, cfg.BaseDirs)
 		assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
-		require.True(t, cfg.NoGitIgnore)
 		require.True(t, cfg.IncludeDot)
-		require.True(t, cfg.NoDirSlash)
+		require.True(t, cfg.AddDirSuffix)
+		require.True(t, cfg.AddDirPrefix)
 		require.True(t, cfg.Mute)
 		assert.Equal(t, -1, cfg.Verbosity, "mute should set verbosity to -1 via finalizer")
 	})
@@ -47,9 +49,9 @@ func TestParse(t *testing.T) {
 		assert.Equal(t, []string{"bar"}, cfg.BaseDirs)
 		assert.Equal(t, []string{}, cfg.SkipPatterns)
 		assert.Zero(t, cfg.Verbosity)
-		require.False(t, cfg.NoGitIgnore)
 		require.False(t, cfg.IncludeDot)
-		require.False(t, cfg.NoDirSlash)
+		require.False(t, cfg.AddDirSuffix)
+		require.False(t, cfg.AddDirPrefix)
 	})
 
 	t.Run("order flag", func(t *testing.T) {

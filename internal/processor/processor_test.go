@@ -49,7 +49,26 @@ func TestProcessorProcess(t *testing.T) {
 	})
 }
 
-func TestScanEntriesHonorsSkips(t *testing.T) {
+func TestResourceStatsAdd(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sums_all_fields", func(t *testing.T) {
+		t.Parallel()
+		base := ResourceStats{Reordered: 1, Added: 2, Removed: 3, Updated: 4, NoOp: 5}
+		add := ResourceStats{Reordered: 10, Added: 20, Removed: 30, Updated: 40, NoOp: 50}
+		base.Add(add)
+		assert.Equal(t, ResourceStats{Reordered: 11, Added: 22, Removed: 33, Updated: 44, NoOp: 55}, base)
+	})
+
+	t.Run("zero_other_leaves_original", func(t *testing.T) {
+		t.Parallel()
+		base := ResourceStats{Reordered: 1, Added: 1, Removed: 1, Updated: 1, NoOp: 1}
+		base.Add(ResourceStats{})
+		assert.Equal(t, ResourceStats{Reordered: 1, Added: 1, Removed: 1, Updated: 1, NoOp: 1}, base)
+	})
+}
+
+func TestScanEntries(t *testing.T) {
 	t.Parallel()
 
 	t.Run("skips and reports", func(t *testing.T) {
@@ -133,7 +152,8 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("kind: test\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		got, exists, err := proc.pickKustomizationPath(temp)
 		require.NoError(t, err)
@@ -146,7 +166,8 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yml")
 		require.NoError(t, os.WriteFile(path, []byte("kind: test\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		got, exists, err := proc.pickKustomizationPath(temp)
 		require.NoError(t, err)
@@ -157,7 +178,8 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 	t.Run("defaults when missing", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		got, exists, err := proc.pickKustomizationPath(temp)
 		require.NoError(t, err)
@@ -174,20 +196,27 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - existing\n"), 0o644))
-		proc := New(Options{DirSlash: true, ResourceOrder: []string{"remote", "dirs"}}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		opts := Options{
+			AddDirPrefix:    true,
+			AddDirSuffix:    true,
+			IgnoredPrefixes: []string{""},
+			ResourceOrder:   []string{"remote", "dirs"},
+		}
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(opts, logger)
 		updated, order, final, stats, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
 		require.NoError(t, err)
 		assert.True(t, updated)
 		assert.Equal(t, 0, stats.Reordered)
 		assert.Equal(t, []string{"existing"}, order)
 		t.Logf("final resources: %v", final)
-		assert.Contains(t, final, "added/")
+		assert.Contains(t, final, "./added/")
 		assert.Contains(t, final, "alpha.yaml")
 		assert.Greater(t, stats.Added, 0)
 
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
-		assert.Contains(t, string(data), "added/")
+		assert.Contains(t, string(data), "./added/")
 		assert.Contains(t, string(data), "apiVersion")
 		assert.Contains(t, string(data), "kind")
 	})
@@ -197,7 +226,8 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		_, _, _, _, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
 		require.NoError(t, err)
@@ -218,7 +248,8 @@ func TestProcessorApplyKustomization(t *testing.T) {
 
 	t.Run("respects skip update", func(t *testing.T) {
 		t.Parallel()
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 		stats, err := proc.applyKustomization("", "", true, nil, nil, true)
 		require.NoError(t, err)
 		assert.Equal(t, 0, stats.Updated)
@@ -229,7 +260,9 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		proc := New(Options{DirSlash: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		opts := Options{AddDirPrefix: true, ResourceOrder: []string{"remote", "dirs"}}
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(opts, logger)
 
 		stats, err := proc.applyKustomization(temp, path, false, []string{"dir"}, []string{"file.yaml"}, false)
 		require.NoError(t, err)
@@ -246,7 +279,8 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - kept\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		root, seq, order, nodes, err := proc.loadKustomization(path, true)
 		require.NoError(t, err)
@@ -260,7 +294,8 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
 
 		root, seq, order, nodes, err := proc.loadKustomization(path, false)
 		require.NoError(t, err)
@@ -336,38 +371,83 @@ func TestMergeResourcesOrders(t *testing.T) {
 
 	t.Run("dir first ordering", func(t *testing.T) {
 		t.Parallel()
+		opts := Options{
+			AddDirPrefix:    true,
+			AddDirSuffix:    true,
+			ResourceOrder:   []string{"remote", "dirs"},
+			IgnoredPrefixes: []string{""},
+		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{DirSlash: true}, logger)
+		proc := New(opts, logger)
 		final := proc.mergeResources([]string{"https://example.com"}, []string{"b", "a"}, []string{"z", "y"})
-		require.Equal(t, []string{"https://example.com", "a/", "b/", "y", "z"}, final)
+		require.Equal(t, []string{"https://example.com", "./a/", "./b/", "y", "z"}, final)
 	})
 
 	t.Run("alphabetical fallback", func(t *testing.T) {
 		t.Parallel()
+		opts := Options{
+			AddDirPrefix:    true,
+			AddDirSuffix:    true,
+			ResourceOrder:   []string{"remote", "files", "dirs"},
+			IgnoredPrefixes: []string{""},
+		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{DirSlash: true, ResourceOrder: []string{"remote", "files", "dirs"}}, logger)
+		proc := New(opts, logger)
 		final := proc.mergeResources([]string{"https://example.com", "https://stable.com"}, []string{"b", "a"}, []string{"x"})
-		require.Equal(t, []string{"https://example.com", "https://stable.com", "x", "a/", "b/"}, final)
+		require.Equal(t, []string{"https://example.com", "https://stable.com", "x", "./a/", "./b/"}, final)
 	})
 }
 
-func TestProcessorDecorateSubdirs(t *testing.T) {
+func TestProcessorEnsureDirSuffix(t *testing.T) {
 	t.Parallel()
 
 	t.Run("appends slash when enabled", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{DirSlash: true}, logger)
-		got := proc.decorateSubdirs([]string{"app", "config/"})
+		opts := Options{AddDirSuffix: true}
+		proc := New(opts, logger)
+		got := proc.ensureDirSuffix([]string{"app", "config"})
 		assert.Equal(t, []string{"app/", "config/"}, got)
 	})
 
 	t.Run("leaves input when disabled", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{DirSlash: false}, logger)
-		got := proc.decorateSubdirs([]string{"app", "config"})
+		opts := Options{}
+		proc := New(opts, logger)
+		got := proc.ensureDirSuffix([]string{"app", "config"})
 		assert.Equal(t, []string{"app", "config"}, got)
+	})
+}
+
+func TestProcessorEnsureDirPrefix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("adds prefix for ignored entries", func(t *testing.T) {
+		t.Parallel()
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		opts := Options{AddDirPrefix: true, IgnoredPrefixes: []string{"skip", "http://"}}
+		proc := New(opts, logger)
+		got := proc.ensureDirPrefix([]string{"skip-me", "http://foo", "ok"})
+		assert.Equal(t, []string{"./skip-me", "./http://foo"}, got)
+	})
+
+	t.Run("returns empty when nothing matches", func(t *testing.T) {
+		t.Parallel()
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		opts := Options{AddDirPrefix: true}
+		proc := New(opts, logger)
+		got := proc.ensureDirPrefix([]string{"app", "test"})
+		assert.Empty(t, got)
+	})
+
+	t.Run("leaves input when disabled", func(t *testing.T) {
+		t.Parallel()
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		opts := Options{}
+		proc := New(opts, logger)
+		got := proc.ensureDirPrefix([]string{"app", "test"})
+		assert.Equal(t, []string{"app", "test"}, got)
 	})
 }
 

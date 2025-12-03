@@ -17,11 +17,12 @@ type Matcher interface {
 	Child(dir string) (Matcher, error)
 }
 
+// Matcher implementation stores the directory-specific state required for path matching.
 type matcher struct {
-	dir      string              // directory that owns this matcher.
-	parent   *matcher            // parent matcher to inherit patterns.
-	patterns []string            // collected patterns from this directory.
-	children map[string]*matcher // cached child matchers.
+	dir      string              // Directory that owns this matcher.
+	parent   *matcher            // Parent matcher to inherit patterns.
+	patterns []string            // Collected patterns from this directory.
+	children map[string]*matcher // Cached child matchers.
 }
 
 // Load creates a matcher rooted at dir; returns nil if useGitignore is false.
@@ -32,6 +33,7 @@ func Load(dir string, useGitignore bool) (Matcher, error) {
 	return newMatcher(dir, nil)
 }
 
+// Creates a matcher rooted at dir; returns nil if dir does not exist.
 func newMatcher(dir string, parent *matcher) (*matcher, error) {
 	m := &matcher{
 		dir:      dir,
@@ -39,7 +41,7 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 		children: make(map[string]*matcher),
 	}
 
-	// load the .gitignore file if it exists.
+	// Load the .gitignore file if it exists.
 	path := filepath.Join(dir, ".gitignore")
 	file, err := os.Open(path)
 	if err != nil {
@@ -50,7 +52,7 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 	}
 	defer file.Close() // nolint:errcheck
 
-	// parse the file into patterns.
+	// Parse the file into patterns.
 	patterns, err := parseGitignore(file)
 	if err != nil {
 		return nil, err
@@ -59,48 +61,50 @@ func newMatcher(dir string, parent *matcher) (*matcher, error) {
 	return m, nil
 }
 
+// Ignored reports whether the given path matches any loaded patterns.
 func (m *matcher) Ignored(fullPath string, isDir bool) bool {
 	if m == nil {
 		return false
 	}
 
-	// compute the relative path to the matcher.
+	// Compute the relative path to the matcher.
 	rel, err := filepath.Rel(m.dir, fullPath)
 	if err != nil {
 		return m.parent.Ignored(fullPath, isDir)
 	}
 
-	// normalize the relative path to a slash-separated string.
+	// Normalize the relative path to a slash-separated string.
 	rel = filepath.ToSlash(rel)
 	if rel == "." {
 		rel = ""
 	}
 
 	for _, pattern := range m.patterns {
-		// short-circuit when a pattern matches the relative path.
+		// Short-circuit when a pattern matches the relative path.
 		if matchesPattern(rel, pattern, isDir) {
 			return true
 		}
 	}
 
-	// recurse into the parent matcher if we have one.
+	// Recurse into the parent matcher if we have one.
 	if m.parent != nil {
 		return m.parent.Ignored(fullPath, isDir)
 	}
 	return false
 }
 
+// Child loads or reuses the matcher for a subdirectory.
 func (m *matcher) Child(dir string) (Matcher, error) {
 	if m == nil {
 		return newMatcher(dir, nil)
 	}
 
-	// reuse existing child matchers.
+	// Reuse existing child matchers.
 	if child, ok := m.children[dir]; ok {
 		return child, nil
 	}
 
-	// create a new child matcher.
+	// Create a new child matcher.
 	child, err := newMatcher(dir, m)
 	if err != nil {
 		return nil, err
@@ -110,7 +114,7 @@ func (m *matcher) Child(dir string) (Matcher, error) {
 	return child, nil
 }
 
-// matchesPattern reports whether rel matches the pattern.
+// ParseGitignore reads patterns from the provided reader.
 func parseGitignore(r io.Reader) ([]string, error) {
 	scanner := bufio.NewScanner(r)
 	var patterns []string
@@ -124,7 +128,7 @@ func parseGitignore(r io.Reader) ([]string, error) {
 	return patterns, scanner.Err()
 }
 
-// matchesPattern reports whether rel matches the pattern.
+// MatchesPattern reports whether rel matches the pattern.
 func matchesPattern(rel, pattern string, isDir bool) bool {
 	if pattern == "" {
 		return false
@@ -139,6 +143,7 @@ func matchesPattern(rel, pattern string, isDir bool) bool {
 		return true
 	}
 
+	// Check for glob patterns.
 	if strings.ContainsAny(pattern, "*?[]") {
 		matched, err := filepath.Match(pattern, rel)
 		if err != nil {

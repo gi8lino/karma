@@ -14,6 +14,7 @@ import (
 
 // Run wires parsing, logging, and processing to execute the command.
 func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.Writer) error {
+// Parse the CLI flags.
 	cfg, err := cli.Parse(version, args)
 	if err != nil {
 		if tinyflags.IsHelpRequested(err) || tinyflags.IsVersionRequested(err) {
@@ -23,26 +24,34 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		return fmt.Errorf("CLI flags error: %w", err)
 	}
 
+// Set up the logger.
 	logLevel := logging.LevelFromVerbosity(cfg.Verbosity)
 	logger := logging.New(stdOut, stdErr, logLevel)
 
+// Log the version and configuration.
 	logger.DebugKV("version", version)
 	logger.DebugKV(
 		"skip", fmt.Sprintf("%v", cfg.SkipPatterns),
-		"no-gitignore", fmt.Sprintf("%v", cfg.NoGitIgnore),
+		"gitignore", fmt.Sprintf("%v", cfg.GitIgnore),
 		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
-		"dir-slash", fmt.Sprintf("%v", cfg.NoDirSlash),
+		"dir-suffix", fmt.Sprintf("%v", cfg.AddDirSuffix),
+		"dir-prefix", fmt.Sprintf("%v", cfg.AddDirPrefix),
+		"ignored-prefixes", fmt.Sprintf("%v", cfg.IgnoredPrefixes),
 		"order", fmt.Sprintf("%v", cfg.ResourceOrder),
 	)
 
+// Create the processor options.
 	opts := processor.Options{
-		Skip:          cfg.SkipPatterns,
-		UseGitIgnore:  !cfg.NoGitIgnore,
-		IncludeDot:    cfg.IncludeDot,
-		DirSlash:      !cfg.NoDirSlash,
-		ResourceOrder: cfg.ResourceOrder,
+		Skip:            cfg.SkipPatterns,
+		UseGitIgnore:    cfg.GitIgnore,
+		IncludeDot:      cfg.IncludeDot,
+		AddDirSuffix:    cfg.AddDirSuffix,
+		AddDirPrefix:    cfg.AddDirPrefix,
+		IgnoredPrefixes: cfg.IgnoredPrefixes,
+		ResourceOrder:   cfg.ResourceOrder,
 	}
 
+// Process each base directory.
 	var totalStats processor.ResourceStats
 	for _, dir := range cfg.BaseDirs {
 		logger.Processing("base", "path", dir)
@@ -51,15 +60,17 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		if err != nil {
 			return err
 		}
-
-		totalStats.Reordered += stats.Reordered
-		totalStats.Added += stats.Added
-		totalStats.Removed += stats.Removed
-		totalStats.Updated += stats.Updated
-		totalStats.NoOp += stats.NoOp
+		totalStats.Add(stats)
 	}
 
-	logger.Summary(totalStats.Updated, totalStats.NoOp, totalStats.Reordered, totalStats.Added, totalStats.Removed)
+// Print the summary.
+	logger.Summary(
+		totalStats.Updated,
+		totalStats.NoOp,
+		totalStats.Reordered,
+		totalStats.Added,
+		totalStats.Removed,
+	)
 
 	return nil
 }

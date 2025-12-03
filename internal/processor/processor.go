@@ -19,19 +19,46 @@ import (
 
 // Options describe how the processor behaves for each tree.
 type Options struct {
-	Skip          []string
-	UseGitIgnore  bool
-	IncludeDot    bool
-	DirSlash      bool
-	ResourceOrder []string
+	ResourceOrder   []string
+	Skip            []string
+	UseGitIgnore    bool
+	IncludeDot      bool
+	AddDirSuffix    bool
+	AddDirPrefix    bool
+	IgnoredPrefixes []string
 }
 
+var defaultDirSlashIgnorePrefixes = []string{
+	"http://",
+	"https://",
+	"/",
+	"./",
+	"../",
+}
+
+// DefaultDirSlashIgnorePrefixes returns the built-in directory ignore prefixes.
+func DefaultDirSlashIgnorePrefixes() []string {
+	out := make([]string, len(defaultDirSlashIgnorePrefixes))
+	copy(out, defaultDirSlashIgnorePrefixes)
+	return out
+}
+
+// ResourceStats holds the results of processing a tree.
 type ResourceStats struct {
 	Reordered int
 	Added     int
 	Removed   int
 	Updated   int
 	NoOp      int
+}
+
+// Add adds the other stats to this one.
+func (s *ResourceStats) Add(other ResourceStats) {
+	s.Reordered += other.Reordered
+	s.Added += other.Added
+	s.Removed += other.Removed
+	s.Updated += other.Updated
+	s.NoOp += other.NoOp
 }
 
 // Processor walks directories and keeps kustomization resources in sync.
@@ -57,12 +84,11 @@ func (p *Processor) Process(ctx context.Context, dir string) (ResourceStats, err
 
 // walkDir processes the current directory and recurses into children.
 func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitignore.Matcher, skipUpdate bool) (ResourceStats, error) {
-	// Load the matcher once so we can reuse it for each directory.
+	// Load the matcher once so it can be reused for each directory.
 	matcher, err := p.loadMatcher(dir, parent)
 	if err != nil {
 		return ResourceStats{}, err
 	}
-	var stats ResourceStats
 
 	// Load the entries once so scanEntries can handle ignores and skip logic.
 	dirEntries, fileEntries, subdirs, err := p.scanEntries(dir, base, matcher)
@@ -70,22 +96,20 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitign
 		return ResourceStats{}, err
 	}
 
-	// Resolve which kustomization file we should touch (yaml or yml).
+	// Resolve which kustomization file should be touched (yaml or yml).
 	kustomizationPath, exists, pathErr := p.pickKustomizationPath(dir)
 	if pathErr != nil {
 		return ResourceStats{}, pathErr
 	}
+
+	var stats ResourceStats
 
 	// Rewrite the kustomization file if it changed.
 	fileStats, err := p.applyKustomization(dir, kustomizationPath, exists, dirEntries, fileEntries, skipUpdate)
 	if err != nil {
 		return ResourceStats{}, err
 	}
-	stats.Reordered += fileStats.Reordered
-	stats.Added += fileStats.Added
-	stats.Removed += fileStats.Removed
-	stats.Updated += fileStats.Updated
-	stats.NoOp += fileStats.NoOp
+	stats.Add(fileStats)
 
 	// Recurse into each child unless marked as "skipWalk".
 	for _, child := range subdirs {
@@ -96,18 +120,14 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitign
 		if err != nil {
 			return ResourceStats{}, err
 		}
-		stats.Reordered += childStats.Reordered
-		stats.Added += childStats.Added
-		stats.Removed += childStats.Removed
-		stats.Updated += childStats.Updated
-		stats.NoOp += childStats.NoOp
+		stats.Add(childStats)
 	}
 
 	return stats, nil
 }
 
 // scanEntries returns the directories, YAML files, and recursion hints for dir.
-// The return tuples are:
+// The returned slices are:
 //
 //	dirEntries: resource directories that belong in this kustomization,
 //	fileEntries: YAML files within dir that belong in this kustomization,
@@ -128,12 +148,12 @@ func (p *Processor) scanEntries(
 			continue
 		}
 
-		// skip hidden entries when configured to ignore dotfiles.
+		// Skip hidden entries when configured to ignore dotfiles.
 		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 
-		// compute the relative path for logging.
+		// Compute the relative path for logging.
 		fullPath := filepath.Join(dir, entry.Name())
 		rel := p.relPath(base, fullPath)
 
@@ -143,26 +163,26 @@ func (p *Processor) scanEntries(
 			continue
 		}
 
-		// ask the skip matcher whether this resource should be withheld.
+		// Ask the skip matcher whether this resource should be withheld.
 		skip, mode, pattern := matchSkip(rel, entry.IsDir(), p.skipRules)
 		if skip {
 			p.logger.Skipped("path", rel, "reason", "pattern", "pattern", pattern)
 			if !entry.IsDir() {
 				continue
 			}
-			// directories may remain listed but we adjust recursion based on skip mode
+			// Directories may remain listed but we adjust recursion based on skip mode
 			dirEntries, childDirs = handleSkipDir(entry, mode, dirEntries, childDirs)
 			continue
 		}
 
-		// record directories and schedule recursive processing.
+		// Record directories and schedule recursive processing.
 		if entry.IsDir() {
 			dirEntries = append(dirEntries, entry.Name())
 			childDirs = append(childDirs, childDir{name: entry.Name()})
 			continue
 		}
 
-		// include eligible YAML files in the resource list.
+		// Include eligible YAML files in the resource list.
 		if isYAML(entry.Name()) {
 			fileEntries = append(fileEntries, entry.Name())
 		}
@@ -195,7 +215,7 @@ func (p *Processor) relPath(base, full string) string {
 func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 	candidates := []string{"kustomization.yaml", "kustomization.yml"}
 	for _, name := range candidates {
-		// probe the candidate path to see if the file exists.
+		// Probe the candidate path to see if the file exists.
 		full := filepath.Join(dir, name)
 		info, err := os.Stat(full)
 		if err == nil {
@@ -205,7 +225,7 @@ func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 			return full, true, nil
 		}
 
-		// propagate unexpected errors rather than treating them as missing.
+		// Propagate unexpected errors rather than treating them as missing.
 		if !errors.Is(err, os.ErrNotExist) {
 			return "", false, err
 		}
@@ -220,13 +240,13 @@ func (p *Processor) updateKustomization(
 	exists bool,
 	dirEntries, fileEntries []string,
 ) (updated bool, order, final []string, stats ResourceStats, err error) {
-	// load or initialize the target YAML document.
+	// Load or initialize the target YAML document.
 	root, seq, order, nodes, err := p.loadKustomization(path, exists)
 	if err != nil {
 		return false, nil, nil, ResourceStats{}, err
 	}
 
-	// build the canonical resource order.
+	// Build the canonical resource order.
 	final = p.mergeResources(order, dirEntries, fileEntries)
 	if slices.Equal(final, order) {
 		return false, order, final, ResourceStats{}, nil
@@ -238,10 +258,10 @@ func (p *Processor) updateKustomization(
 		stats.Reordered = 1
 	}
 
-	// build scalar nodes for each entry.
+	// Build scalar nodes for each entry.
 	content := make([]*yaml.Node, 0, len(final))
 	for _, val := range final {
-		// reuse existing nodes whenever possible.
+		// Reuse existing nodes whenever possible.
 		if node, ok := nodes[val]; ok {
 			content = append(content, node)
 			continue
@@ -254,7 +274,7 @@ func (p *Processor) updateKustomization(
 	}
 	seq.Content = content
 
-	// encode through a buffer so we can add the document marker.
+	// Encode through a buffer so the document marker can be added.
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -265,19 +285,19 @@ func (p *Processor) updateKustomization(
 		return false, nil, nil, ResourceStats{}, fmt.Errorf("close encoder: %w", err)
 	}
 
-	// create or truncate the target file before writing the encoded YAML.
+	// Create or truncate the target file before writing the encoded YAML.
 	file, err := os.Create(path)
 	if err != nil {
 		return false, nil, nil, ResourceStats{}, fmt.Errorf("create %s: %w", path, err)
 	}
 	defer file.Close() // nolint:errcheck
 
-	// always prepend the canonical document start.
+	// Always prepend the canonical document start.
 	if _, err := file.WriteString("---\n"); err != nil {
 		return false, nil, nil, ResourceStats{}, fmt.Errorf("write prefix: %w", err)
 	}
 
-	// write the encoded document after the header.
+	// Write the encoded document after the header.
 	if _, err := file.Write(buf.Bytes()); err != nil {
 		return false, nil, nil, ResourceStats{}, fmt.Errorf("write content: %w", err)
 	}
@@ -300,12 +320,12 @@ func diffEntries(old, new []string) (added, removed []string) {
 			}
 			continue
 		}
-		// record newly introduced entries.
+		// Record newly introduced entries.
 		added = append(added, entry)
 	}
 
 	for entry, count := range counts {
-		// anything left in counts was removed.
+		// Anything left in counts was removed.
 		for range count {
 			removed = append(removed, entry)
 		}
@@ -318,7 +338,7 @@ func diffEntries(old, new []string) (added, removed []string) {
 func orderChanged(old, new []string) bool {
 	indexes := make(map[string][]int, len(old))
 
-	// map each original entry to all of its positions so we can detect interleaved duplicates.
+	// Map each original entry to all of its positions so interleaved duplicates can be detected.
 	for i, entry := range old {
 		indexes[entry] = append(indexes[entry], i)
 	}
@@ -328,18 +348,18 @@ func orderChanged(old, new []string) bool {
 	for _, entry := range new {
 		list, ok := indexes[entry]
 		if !ok {
-			// newly added entry, skip it.
+			// Newly added entry, skip it.
 			continue
 		}
 		idx := consumed[entry]
 		if idx >= len(list) {
-			// all occurrences of this entry already tracked; ignore extras.
+			// All occurrences of this entry already tracked; ignore extras.
 			continue
 		}
 		pos := list[idx]
 		consumed[entry]++
 		if prev > pos && prev != -1 {
-			// detected a previously seen entry that now appears earlier—order changed.
+			// Detected a previously seen entry that now appears earlier—order changed.
 			return true
 		}
 		prev = pos
@@ -360,12 +380,12 @@ func (p *Processor) applyKustomization(
 		return ResourceStats{}, nil
 	}
 
-	// rewrite the file unless skipUpdate was requested.
+	// Rewrite the file unless skipUpdate was requested.
 	updatedDir, order, final, stats, err := p.updateKustomization(path, exists, dirEntries, fileEntries)
 	if err != nil {
 		return ResourceStats{}, err
 	}
-	// log whether we updated anything.
+	// Log whether the file was updated.
 	if updatedDir {
 		stats = p.logUpdate(path, stats, order, final)
 		stats.Updated = 1
@@ -407,7 +427,7 @@ func (p *Processor) loadKustomization(
 	root = &yaml.Node{}
 
 	if exists {
-		// read the existing node tree to preserve comments.
+		// Read the existing node tree to preserve comments.
 		var data []byte
 		data, err = os.ReadFile(path)
 		if err != nil {
@@ -419,17 +439,17 @@ func (p *Processor) loadKustomization(
 		}
 	}
 
-	// ensure the node is treated as a document.
+	// Ensure the node is treated as a document.
 	if root.Kind != yaml.DocumentNode {
 		root.Kind = yaml.DocumentNode
 	}
 
-	// initialize an empty mapping if the document was empty.
+	// Initialize an empty mapping if the document was empty.
 	if len(root.Content) == 0 {
 		root.Content = []*yaml.Node{{Kind: yaml.MappingNode}}
 	}
 
-	// normalize the first child to a mapping node.
+	// Normalize the first child to a mapping node.
 	if root.Content[0].Kind != yaml.MappingNode {
 		root.Content[0].Kind = yaml.MappingNode
 	}
@@ -444,27 +464,27 @@ func (p *Processor) loadKustomization(
 func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes map[string]*yaml.Node, err error) {
 	mapNode := root.Content[0]
 	for i := 0; i < len(mapNode.Content); i += 2 {
-		// iterate key/value pairs, keeping resources when found.
+		// Iterate key/value pairs, keeping resources when found.
 		if i+1 >= len(mapNode.Content) {
 			break
 		}
 
 		key := mapNode.Content[i]
 		if key.Value == "resources" {
-			// stop at the first resources entry so we can reuse its sequence.
+			// Stop at the first resources entry so it can be reused.
 			seq = mapNode.Content[i+1]
 			break
 		}
 	}
 
-	// create a resources sequence if none exists yet.
+	// Create a resources sequence if none exists yet.
 	if seq == nil {
 		seq = &yaml.Node{Kind: yaml.SequenceNode}
 		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "resources", Tag: "!!str"}
 		mapNode.Content = append(mapNode.Content, keyNode, seq)
 	}
 
-	// normalize the entry to a sequence node before usage.
+	// Normalize the entry to a sequence node before usage.
 	if seq.Kind != yaml.SequenceNode {
 		seq.Kind = yaml.SequenceNode
 	}
@@ -475,7 +495,7 @@ func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes 
 
 // ensureHeader injects the canonical header keys at the top when missing.
 func ensureHeader(mapNode *yaml.Node) {
-	// detect if a header already exists; if so, leave it untouched.
+	// Detect if a header already exists; if so, leave it untouched.
 	for i := 0; i < len(mapNode.Content); i += 2 {
 		key := mapNode.Content[i].Value
 		if key == "apiVersion" || key == "kind" {
@@ -500,12 +520,12 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 	order = make([]string, 0, len(seq.Content))
 
 	for _, node := range seq.Content {
-		// ignore anything that is not a scalar resource entry.
+		// Ignore anything that is not a scalar resource entry.
 		if node.Kind != yaml.ScalarNode {
 			continue
 		}
 
-		// record the first occurrence and map the node for reuse.
+		// Record the first occurrence and map the node for reuse.
 		if _, exists := nodes[node.Value]; !exists {
 			order = append(order, node.Value)
 		}
@@ -518,13 +538,14 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 
 // mergeResources produces the canonical ordering for resources.
 func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []string) []string {
-	dirs := p.decorateSubdirs(dirEntries)
-	files := append([]string(nil), fileEntries...) // create a copy of the existing resources.
+	dirs := p.ensureDirPrefix(dirEntries)
+	dirs = p.ensureDirSuffix(dirs)
+	files := append([]string(nil), fileEntries...) // Create a copy of the existing resources.
 
 	sort.Strings(dirs)
 	sort.Strings(files)
 
-	// preserve remote resources from existing order.
+	// Preserve remote resources from existing order.
 	remote := make([]string, 0, len(existing))
 	for _, value := range existing {
 		if isRemoteResource(value) {
@@ -550,15 +571,38 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	return utils.DedupPreserve(final)
 }
 
-// decorateSubdirs appends slash suffixes when configured.
-func (p *Processor) decorateSubdirs(subdirs []string) []string {
-	if !p.opts.DirSlash {
+// ensureDirSuffix appends slash suffixes when configured.
+func (p *Processor) ensureDirSuffix(subdirs []string) []string {
+	if !p.opts.AddDirSuffix {
 		return subdirs
 	}
 	out := make([]string, 0, len(subdirs))
 	for _, s := range subdirs {
-		trimmed, _ := strings.CutSuffix(s, "/")
-		out = append(out, trimmed+"/")
+		out = append(out, strings.TrimSuffix(s, "/")+"/")
 	}
 	return out
+}
+
+// ensureDirPrefix appends slash prefixes when configured.
+func (p *Processor) ensureDirPrefix(subdirs []string) []string {
+	if !p.opts.AddDirPrefix {
+		return subdirs
+	}
+	out := make([]string, 0, len(subdirs))
+	for _, sub := range subdirs {
+		if p.hasIgnoredPrefix(sub) {
+			out = append(out, "./"+sub)
+		}
+	}
+	return out
+}
+
+// hasIgnoredPrefix returns true when the directory has a prefix that should be ignored.
+func (p *Processor) hasIgnoredPrefix(dir string) bool {
+	for _, prefix := range p.opts.IgnoredPrefixes {
+		if strings.HasPrefix(dir, prefix) {
+			return true
+		}
+	}
+	return false
 }
