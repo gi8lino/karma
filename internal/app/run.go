@@ -14,7 +14,7 @@ import (
 
 // Run wires parsing, logging, and processing to execute the command.
 func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.Writer) error {
-// Parse the CLI flags.
+	// Parse the CLI flags.
 	cfg, err := cli.Parse(version, args)
 	if err != nil {
 		if tinyflags.IsHelpRequested(err) || tinyflags.IsVersionRequested(err) {
@@ -24,11 +24,11 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		return fmt.Errorf("CLI flags error: %w", err)
 	}
 
-// Set up the logger.
+	// Set up the logger.
 	logLevel := logging.LevelFromVerbosity(cfg.Verbosity)
 	logger := logging.New(stdOut, stdErr, logLevel)
 
-// Log the version and configuration.
+	// Log the version and configuration.
 	logger.DebugKV("version", version)
 	logger.DebugKV(
 		"skip", fmt.Sprintf("%v", cfg.SkipPatterns),
@@ -40,7 +40,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		"order", fmt.Sprintf("%v", cfg.ResourceOrder),
 	)
 
-// Create the processor options.
+	// Create the processor options.
 	opts := processor.Options{
 		Skip:            cfg.SkipPatterns,
 		UseGitIgnore:    cfg.GitIgnore,
@@ -51,7 +51,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		ResourceOrder:   cfg.ResourceOrder,
 	}
 
-// Process each base directory.
+	// Process each base directory.
 	var totalStats processor.ResourceStats
 	for _, dir := range cfg.BaseDirs {
 		logger.Processing("base", "path", dir)
@@ -63,7 +63,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		totalStats.Add(stats)
 	}
 
-// Print the summary.
+	// Print the summary.
 	logger.Summary(
 		totalStats.Updated,
 		totalStats.NoOp,

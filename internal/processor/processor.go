@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -90,22 +91,30 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitign
 		return ResourceStats{}, err
 	}
 
-	// Load the entries once so scanEntries can handle ignores and skip logic.
-	dirEntries, fileEntries, subdirs, err := p.scanEntries(dir, base, matcher)
-	if err != nil {
-		return ResourceStats{}, err
-	}
-
 	// Resolve which kustomization file should be touched (yaml or yml).
 	kustomizationPath, exists, pathErr := p.pickKustomizationPath(dir)
 	if pathErr != nil {
 		return ResourceStats{}, pathErr
 	}
+	component := false
+	if exists {
+		kind, kindErr := readKustomizeKind(kustomizationPath)
+		if kindErr != nil {
+			return ResourceStats{}, kindErr
+		}
+		component = strings.EqualFold(kind, "Component")
+	}
+
+	// Load the entries once so scanEntries can handle ignores and skip logic.
+	dirEntries, fileEntries, subdirs, err := p.scanEntries(dir, base, matcher, kustomizationPath)
+	if err != nil {
+		return ResourceStats{}, err
+	}
 
 	var stats ResourceStats
 
 	// Rewrite the kustomization file if it changed.
-	fileStats, err := p.applyKustomization(dir, kustomizationPath, exists, dirEntries, fileEntries, skipUpdate)
+	fileStats, err := p.applyKustomization(dir, kustomizationPath, exists, dirEntries, fileEntries, skipUpdate || component)
 	if err != nil {
 		return ResourceStats{}, err
 	}
@@ -135,6 +144,7 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitign
 func (p *Processor) scanEntries(
 	dir, base string,
 	matcher gitignore.Matcher,
+	kustomizationPath string,
 ) (dirEntries []string, fileEntries []string, childDirs []childDir, err error) {
 	// Get all items in the directory.
 	entries, err := os.ReadDir(dir)
@@ -144,7 +154,8 @@ func (p *Processor) scanEntries(
 
 	// Walk entries so ignores and skip patterns are applied deterministically.
 	for _, entry := range entries {
-		if isKustomization(entry.Name()) {
+		fullPath := filepath.Join(dir, entry.Name())
+		if isKustomization(entry.Name()) || (kustomizationPath != "" && filepath.Clean(fullPath) == filepath.Clean(kustomizationPath)) {
 			continue
 		}
 
@@ -154,7 +165,6 @@ func (p *Processor) scanEntries(
 		}
 
 		// Compute the relative path for logging.
-		fullPath := filepath.Join(dir, entry.Name())
 		rel := p.relPath(base, fullPath)
 
 		// Check .gitignore before skip patterns.
@@ -230,8 +240,82 @@ func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
 			return "", false, err
 		}
 	}
+
+	// Fall back to a kustomization detected by kind.
+	kindPath, err := p.kustomizationByKind(dir)
+	if err != nil {
+		return "", false, err
+	}
+	if kindPath != "" {
+		return kindPath, true, nil
+	}
+
 	// If we didn't find a kustomization, create one.
 	return filepath.Join(dir, "kustomization.yaml"), false, nil
+}
+
+// kustomizationByKind returns the first YAML file whose kind is Kustomization.
+func (p *Processor) kustomizationByKind(dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if !isYAML(entry.Name()) {
+			continue
+		}
+
+		fullPath := filepath.Join(dir, entry.Name())
+		match, err := hasKustomizationKind(fullPath)
+		if err != nil {
+			continue
+		}
+		if match {
+			return fullPath, nil
+		}
+	}
+
+	return "", nil
+}
+
+// hasKustomizationKind reports whether the YAML file declares kind: Kustomization.
+func hasKustomizationKind(path string) (bool, error) {
+	kind, err := readKustomizeKind(path)
+	if err != nil {
+		return false, err
+	}
+	return kind == "Kustomization", nil
+}
+
+// readKustomizeKind extracts the first non-empty kind from a YAML file.
+func readKustomizeKind(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var meta struct {
+			Kind string `yaml:"kind"`
+		}
+		if err := dec.Decode(&meta); err != nil {
+			if errors.Is(err, io.EOF) {
+				return "", nil
+			}
+			return "", err
+		}
+		if meta.Kind != "" {
+			return meta.Kind, nil
+		}
+	}
 }
 
 // updateKustomization rewrites the resources section if it changed.

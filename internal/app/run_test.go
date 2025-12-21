@@ -57,4 +57,21 @@ func TestRun(t *testing.T) {
 		assert.Contains(t, out.String(), "v9.9.9")
 		assert.Empty(t, errOut.String())
 	})
+
+	t.Run("skips files matching patterns", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "patch-extra.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		var out, errOut bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"-s", "patch-*", temp}, &out, &errOut)
+		require.NoError(t, err)
+		assert.Empty(t, errOut.String())
+
+		data, err := os.ReadFile(filepath.Join(temp, "kustomization.yaml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "app.yaml")
+		assert.NotContains(t, string(data), "patch-extra.yaml")
+	})
 }

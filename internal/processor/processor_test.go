@@ -47,6 +47,44 @@ func TestProcessorProcess(t *testing.T) {
 		assert.Equal(t, 0, stats.Updated)
 		assert.Equal(t, 1, stats.NoOp)
 	})
+
+	t.Run("skips named component", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		kustom := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(kustom, []byte("kind: Component\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		stats, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+		assert.Equal(t, ResourceStats{}, stats)
+
+		data, err := os.ReadFile(kustom)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "Component")
+		assert.NotContains(t, string(data), "resources:")
+	})
+
+	t.Run("detects kustomization by kind when name differs", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		kustom := filepath.Join(temp, "custom.yaml")
+		require.NoError(t, os.WriteFile(kustom, []byte("kind: Kustomization\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		stats, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+		assert.Equal(t, 1, stats.Updated)
+		assert.Equal(t, 0, stats.NoOp)
+
+		data, err := os.ReadFile(kustom)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "resources:")
+		assert.Contains(t, string(data), "app.yaml")
+		assert.NotContains(t, string(data), "custom.yaml")
+	})
 }
 
 func TestResourceStatsAdd(t *testing.T) {
@@ -84,7 +122,7 @@ func TestScanEntries(t *testing.T) {
 			IncludeDot: false,
 		}, logger)
 
-		dirEntries, fileEntries, childDirs, err := proc.scanEntries(temp, temp, nil)
+		dirEntries, fileEntries, childDirs, err := proc.scanEntries(temp, temp, nil, "")
 		require.NoError(t, err)
 		assert.Contains(t, dirEntries, "normal")
 		assert.Contains(t, dirEntries, "skipdir")
@@ -166,6 +204,36 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yml")
 		require.NoError(t, os.WriteFile(path, []byte("kind: test\n"), 0o644))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
+
+		got, exists, err := proc.pickKustomizationPath(temp)
+		require.NoError(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, path, got)
+	})
+
+	t.Run("prefers named file over kind match", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		named := filepath.Join(temp, "kustomization.yaml")
+		other := filepath.Join(temp, "other.yaml")
+		require.NoError(t, os.WriteFile(named, []byte("kind: test\n"), 0o644))
+		require.NoError(t, os.WriteFile(other, []byte("kind: Kustomization\n"), 0o644))
+		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		proc := New(Options{}, logger)
+
+		got, exists, err := proc.pickKustomizationPath(temp)
+		require.NoError(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, named, got)
+	})
+
+	t.Run("falls back to kind match when unnamed", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "not-kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("kind: Kustomization\n"), 0o644))
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
