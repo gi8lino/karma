@@ -53,6 +53,8 @@ func TestParse(t *testing.T) {
 		require.False(t, cfg.IncludeDot)
 		require.False(t, cfg.AddDirSuffix)
 		require.False(t, cfg.AddDirPrefix)
+		require.False(t, cfg.DryRun)
+		require.False(t, cfg.Check)
 	})
 
 	t.Run("order flag", func(t *testing.T) {
@@ -98,4 +100,26 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"files", "dirs", "remote"}, cfg.ResourceOrder)
 	})
+	t.Run("dry run", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"--dry-run", "foo"})
+		require.NoError(t, err)
+		assert.True(t, cfg.DryRun)
+		assert.False(t, cfg.Check)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := Parse("1.0.0", []string{"--check", "foo"})
+		require.NoError(t, err)
+		assert.True(t, cfg.Check)
+		assert.False(t, cfg.DryRun)
+	})
+
+	t.Run("dry run and check conflict", func(t *testing.T) {
+		t.Parallel()
+		_, err := Parse("1.0.0", []string{"--dry-run", "--check", "foo"})
+		require.Error(t, err)
+	})
+
 }

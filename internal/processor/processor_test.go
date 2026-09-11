@@ -339,6 +339,20 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		assert.Contains(t, string(data), "resources:")
 	})
 
+	t.Run("dry run reports update without writing", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		proc := New(Options{DryRun: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		updated, _, final, _, err := proc.updateKustomization(path, false, nil, []string{"app.yaml"})
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, []string{"app.yaml"}, final)
+		_, err = os.Stat(path)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+
 	t.Run("returns false when unchanged", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()

@@ -19,6 +19,8 @@ type Config struct {
 	Mute          bool
 	AddDirSuffix  bool
 	AddDirPrefix  bool
+	DryRun        bool
+	Check         bool
 	ResourceOrder []string
 }
 
@@ -72,6 +74,14 @@ func Parse(version string, args []string) (Config, error) {
 	fs.BoolVar(&cfg.AddDirPrefix, "prefix", false, "Enable prefixing directories with \"./\".").
 		Short("p").
 		OneOfGroup("prefix").
+		Value()
+
+	// Execution
+	fs.BoolVar(&cfg.DryRun, "dry-run", false, "Show changes without writing files.").
+		OneOfGroup("execution").
+		Value()
+	fs.BoolVar(&cfg.Check, "check", false, "Exit non-zero when changes would be required without writing files.").
+		OneOfGroup("execution").
 		Value()
 
 	// Logging

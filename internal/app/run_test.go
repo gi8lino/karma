@@ -74,4 +74,46 @@ func TestRun(t *testing.T) {
 		assert.Contains(t, string(data), "app.yaml")
 		assert.NotContains(t, string(data), "patch-extra.yaml")
 	})
+	t.Run("dry run does not write", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		var out, errOut bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--dry-run", temp}, &out, &errOut)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "updated=1")
+		_, err = os.Stat(filepath.Join(temp, "kustomization.yaml"))
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+
+	t.Run("check fails when changes are required without writing", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		var out, errOut bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out, &errOut)
+		require.ErrorIs(t, err, ErrCheckFailed)
+		assert.Contains(t, out.String(), "updated=1")
+		_, statErr := os.Stat(filepath.Join(temp, "kustomization.yaml"))
+		require.ErrorIs(t, statErr, os.ErrNotExist)
+	})
+
+	t.Run("check succeeds when already synchronized", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - app.yaml
+`), 0o644))
+
+		var out, errOut bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out, &errOut)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "updated=0")
+	})
+
 }

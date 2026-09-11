@@ -19,6 +19,8 @@ karma [options] <base-dir>...
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--suffix`, `-x` – Append `/` when listing directories.
 - `--prefix`, `-p` – Prefix directory entries with `./`.
+- `--dry-run` – Show the changes Karma would make without writing files.
+- `--check` – Do not write files and exit non-zero when any kustomization is out of sync.
 
 ## Logging
 
@@ -33,6 +35,7 @@ karma [options] <base-dir>...
 - Preserves remote and non-direct resource references, supports optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
 - Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
 - Plans and updates per base directory, reporting a final summary.
+- Supports non-mutating `--dry-run` previews and CI-friendly `--check` validation.
 
 ## Testing
 

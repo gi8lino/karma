@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -11,6 +12,9 @@ import (
 
 	"github.com/containeroo/tinyflags"
 )
+
+// ErrCheckFailed indicates that --check found kustomizations that need updates.
+var ErrCheckFailed = errors.New("kustomizations are not in sync")
 
 // Run wires parsing, logging, and processing to execute the command.
 func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.Writer) error {
@@ -36,6 +40,8 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
 		"dir-suffix", fmt.Sprintf("%v", cfg.AddDirSuffix),
 		"dir-prefix", fmt.Sprintf("%v", cfg.AddDirPrefix),
+		"dry-run", fmt.Sprintf("%v", cfg.DryRun || cfg.Check),
+		"check", fmt.Sprintf("%v", cfg.Check),
 		"order", fmt.Sprintf("%v", cfg.ResourceOrder),
 	)
 
@@ -46,6 +52,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		IncludeDot:    cfg.IncludeDot,
 		AddDirSuffix:  cfg.AddDirSuffix,
 		AddDirPrefix:  cfg.AddDirPrefix,
+		DryRun:        cfg.DryRun || cfg.Check,
 		ResourceOrder: cfg.ResourceOrder,
 	}
 
@@ -69,6 +76,10 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		totalStats.Added,
 		totalStats.Removed,
 	)
+
+	if cfg.Check && totalStats.Updated > 0 {
+		return ErrCheckFailed
+	}
 
 	return nil
 }

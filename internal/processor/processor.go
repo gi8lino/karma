@@ -24,6 +24,7 @@ type Options struct {
 	IncludeDot    bool
 	AddDirSuffix  bool
 	AddDirPrefix  bool
+	DryRun        bool
 }
 
 // ResourceStats holds the results of processing a tree.
@@ -310,8 +311,10 @@ func (p *Processor) updateKustomization(
 	payload := make([]byte, 0, len(buf.Bytes())+4)
 	payload = append(payload, "---\n"...)
 	payload = append(payload, buf.Bytes()...)
-	if err := writeFileAtomic(path, payload, 0o644); err != nil {
-		return false, nil, nil, ResourceStats{}, fmt.Errorf("write %s: %w", path, err)
+	if !p.opts.DryRun {
+		if err := writeFileAtomic(path, payload, 0o644); err != nil {
+			return false, nil, nil, ResourceStats{}, fmt.Errorf("write %s: %w", path, err)
+		}
 	}
 
 	return true, order, final, stats, nil
