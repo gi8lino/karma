@@ -20,7 +20,6 @@ func TestParse(t *testing.T) {
 			"--include-dot",
 			"--suffix",
 			"--prefix",
-			"--prefix-ignore", "skip",
 			"-q",
 			"foo",
 		})

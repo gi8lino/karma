@@ -265,10 +265,9 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - existing\n"), 0o644))
 		opts := Options{
-			AddDirPrefix:    true,
-			AddDirSuffix:    true,
-			IgnoredPrefixes: []string{""},
-			ResourceOrder:   []string{"remote", "dirs"},
+			AddDirPrefix:  true,
+			AddDirSuffix:  true,
+			ResourceOrder: []string{"remote", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
@@ -440,10 +439,9 @@ func TestMergeResourcesOrders(t *testing.T) {
 	t.Run("dir first ordering", func(t *testing.T) {
 		t.Parallel()
 		opts := Options{
-			AddDirPrefix:    true,
-			AddDirSuffix:    true,
-			ResourceOrder:   []string{"remote", "dirs"},
-			IgnoredPrefixes: []string{""},
+			AddDirPrefix:  true,
+			AddDirSuffix:  true,
+			ResourceOrder: []string{"remote", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
@@ -454,10 +452,9 @@ func TestMergeResourcesOrders(t *testing.T) {
 	t.Run("alphabetical fallback", func(t *testing.T) {
 		t.Parallel()
 		opts := Options{
-			AddDirPrefix:    true,
-			AddDirSuffix:    true,
-			ResourceOrder:   []string{"remote", "files", "dirs"},
-			IgnoredPrefixes: []string{""},
+			AddDirPrefix:  true,
+			AddDirSuffix:  true,
+			ResourceOrder: []string{"remote", "files", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
@@ -491,22 +488,13 @@ func TestProcessorEnsureDirSuffix(t *testing.T) {
 func TestProcessorEnsureDirPrefix(t *testing.T) {
 	t.Parallel()
 
-	t.Run("adds prefix for ignored entries", func(t *testing.T) {
-		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		opts := Options{AddDirPrefix: true, IgnoredPrefixes: []string{"skip", "http://"}}
-		proc := New(opts, logger)
-		got := proc.ensureDirPrefix([]string{"skip-me", "http://foo", "ok"})
-		assert.Equal(t, []string{"./skip-me", "./http://foo"}, got)
-	})
-
-	t.Run("returns empty when nothing matches", func(t *testing.T) {
+	t.Run("adds prefix to every directory", func(t *testing.T) {
 		t.Parallel()
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		opts := Options{AddDirPrefix: true}
 		proc := New(opts, logger)
-		got := proc.ensureDirPrefix([]string{"app", "test"})
-		assert.Empty(t, got)
+		got := proc.ensureDirPrefix([]string{"app", "test", "./already"})
+		assert.Equal(t, []string{"./app", "./test", "./already"}, got)
 	})
 
 	t.Run("leaves input when disabled", func(t *testing.T) {

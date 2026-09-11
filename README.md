@@ -19,7 +19,6 @@ karma [options] <base-dir>...
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--suffix`, `-x` – Append `/` when listing directories.
 - `--prefix`, `-p` – Prefix directory entries with `./`.
-- `--prefix-ignore` – List prefixes (default `http://`, `https://`, `/`, `./`, `../`) that should remain untouched by the slash/prefix helpers.
 
 ## Logging
 

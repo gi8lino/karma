@@ -20,28 +20,12 @@ import (
 
 // Options describe how the processor behaves for each tree.
 type Options struct {
-	ResourceOrder   []string
-	Skip            []string
-	UseGitIgnore    bool
-	IncludeDot      bool
-	AddDirSuffix    bool
-	AddDirPrefix    bool
-	IgnoredPrefixes []string
-}
-
-var defaultDirSlashIgnorePrefixes = []string{
-	"http://",
-	"https://",
-	"/",
-	"./",
-	"../",
-}
-
-// DefaultDirSlashIgnorePrefixes returns the built-in directory ignore prefixes.
-func DefaultDirSlashIgnorePrefixes() []string {
-	out := make([]string, len(defaultDirSlashIgnorePrefixes))
-	copy(out, defaultDirSlashIgnorePrefixes)
-	return out
+	ResourceOrder []string
+	Skip          []string
+	UseGitIgnore  bool
+	IncludeDot    bool
+	AddDirSuffix  bool
+	AddDirPrefix  bool
 }
 
 // ResourceStats holds the results of processing a tree.
@@ -674,19 +658,7 @@ func (p *Processor) ensureDirPrefix(subdirs []string) []string {
 	}
 	out := make([]string, 0, len(subdirs))
 	for _, sub := range subdirs {
-		if p.hasIgnoredPrefix(sub) {
-			out = append(out, "./"+sub)
-		}
+		out = append(out, "./"+strings.TrimPrefix(sub, "./"))
 	}
 	return out
-}
-
-// hasIgnoredPrefix returns true when the directory has a prefix that should be ignored.
-func (p *Processor) hasIgnoredPrefix(dir string) bool {
-	for _, prefix := range p.opts.IgnoredPrefixes {
-		if strings.HasPrefix(dir, prefix) {
-			return true
-		}
-	}
-	return false
 }

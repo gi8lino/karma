@@ -11,16 +11,15 @@ import (
 
 // Config holds parsed command-line options.
 type Config struct {
-	BaseDirs        []string
-	SkipPatterns    []string
-	Verbosity       int
-	GitIgnore       bool
-	IncludeDot      bool
-	Mute            bool
-	AddDirSuffix    bool
-	AddDirPrefix    bool
-	IgnoredPrefixes []string
-	ResourceOrder   []string
+	BaseDirs      []string
+	SkipPatterns  []string
+	Verbosity     int
+	GitIgnore     bool
+	IncludeDot    bool
+	Mute          bool
+	AddDirSuffix  bool
+	AddDirPrefix  bool
+	ResourceOrder []string
 }
 
 // Parse builds user configuration from CLI args.
@@ -72,9 +71,6 @@ func Parse(version string, args []string) (Config, error) {
 	fs.BoolVar(&cfg.AddDirPrefix, "prefix", false, "Enable prefixing directories with \"./\".").
 		Short("p").
 		OneOfGroup("prefix").
-		Value()
-	fs.StringSliceVar(&cfg.IgnoredPrefixes, "prefix-ignore", processor.DefaultDirSlashIgnorePrefixes(),
-		"Skip trailing slash for resources starting with prefixes.").
 		Value()
 
 	// Logging

@@ -36,19 +36,17 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
 		"dir-suffix", fmt.Sprintf("%v", cfg.AddDirSuffix),
 		"dir-prefix", fmt.Sprintf("%v", cfg.AddDirPrefix),
-		"ignored-prefixes", fmt.Sprintf("%v", cfg.IgnoredPrefixes),
 		"order", fmt.Sprintf("%v", cfg.ResourceOrder),
 	)
 
 	// Create the processor options.
 	opts := processor.Options{
-		Skip:            cfg.SkipPatterns,
-		UseGitIgnore:    cfg.GitIgnore,
-		IncludeDot:      cfg.IncludeDot,
-		AddDirSuffix:    cfg.AddDirSuffix,
-		AddDirPrefix:    cfg.AddDirPrefix,
-		IgnoredPrefixes: cfg.IgnoredPrefixes,
-		ResourceOrder:   cfg.ResourceOrder,
+		Skip:          cfg.SkipPatterns,
+		UseGitIgnore:  cfg.GitIgnore,
+		IncludeDot:    cfg.IncludeDot,
+		AddDirSuffix:  cfg.AddDirSuffix,
+		AddDirPrefix:  cfg.AddDirPrefix,
+		ResourceOrder: cfg.ResourceOrder,
 	}
 
 	// Process each base directory.
