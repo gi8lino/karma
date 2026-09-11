@@ -66,24 +66,26 @@ func TestProcessorProcess(t *testing.T) {
 		assert.NotContains(t, string(data), "resources:")
 	})
 
-	t.Run("detects kustomization by kind when name differs", func(t *testing.T) {
+	t.Run("does not use arbitrary yaml by kind", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
-		kustom := filepath.Join(temp, "custom.yaml")
-		require.NoError(t, os.WriteFile(kustom, []byte("kind: Kustomization\n"), 0o644))
+		custom := filepath.Join(temp, "custom.yaml")
+		require.NoError(t, os.WriteFile(custom, []byte("kind: Kustomization\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
 		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
 		assert.Equal(t, 1, stats.Updated)
-		assert.Equal(t, 0, stats.NoOp)
 
-		data, err := os.ReadFile(kustom)
+		data, err := os.ReadFile(filepath.Join(temp, "kustomization.yaml"))
 		require.NoError(t, err)
-		assert.Contains(t, string(data), "resources:")
 		assert.Contains(t, string(data), "app.yaml")
-		assert.NotContains(t, string(data), "custom.yaml")
+		assert.Contains(t, string(data), "custom.yaml")
+
+		customData, err := os.ReadFile(custom)
+		require.NoError(t, err)
+		assert.Equal(t, "kind: Kustomization\n", string(customData))
 	})
 }
 
@@ -161,69 +163,39 @@ func TestProcessorRelPath(t *testing.T) {
 func TestProcessorPickKustomizationPath(t *testing.T) {
 	t.Parallel()
 
-	t.Run("selects yaml when present", func(t *testing.T) {
+	for _, name := range kustomizationNames {
+		name := name
+		t.Run("selects "+name, func(t *testing.T) {
+			t.Parallel()
+			temp := t.TempDir()
+			path := filepath.Join(temp, name)
+			require.NoError(t, os.WriteFile(path, []byte("kind: Kustomization\n"), 0o644))
+			proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+			got, exists, err := proc.pickKustomizationPath(temp)
+			require.NoError(t, err)
+			assert.True(t, exists)
+			assert.Equal(t, path, got)
+		})
+	}
+
+	t.Run("rejects multiple canonical files", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
-		path := filepath.Join(temp, "kustomization.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("kind: test\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{}, logger)
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "kustomization.yaml"), []byte("kind: Kustomization\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "Kustomization"), []byte("kind: Kustomization\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
-		got, exists, err := proc.pickKustomizationPath(temp)
-		require.NoError(t, err)
-		assert.True(t, exists)
-		assert.Equal(t, path, got)
+		_, _, err := proc.pickKustomizationPath(temp)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "multiple kustomization files")
 	})
 
-	t.Run("selects yml when only yml exists", func(t *testing.T) {
+	t.Run("ignores yaml kind when filename is not canonical", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
-		path := filepath.Join(temp, "kustomization.yml")
-		require.NoError(t, os.WriteFile(path, []byte("kind: test\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{}, logger)
-
-		got, exists, err := proc.pickKustomizationPath(temp)
-		require.NoError(t, err)
-		assert.True(t, exists)
-		assert.Equal(t, path, got)
-	})
-
-	t.Run("prefers named file over kind match", func(t *testing.T) {
-		t.Parallel()
-		temp := t.TempDir()
-		named := filepath.Join(temp, "kustomization.yaml")
-		other := filepath.Join(temp, "other.yaml")
-		require.NoError(t, os.WriteFile(named, []byte("kind: test\n"), 0o644))
-		require.NoError(t, os.WriteFile(other, []byte("kind: Kustomization\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{}, logger)
-
-		got, exists, err := proc.pickKustomizationPath(temp)
-		require.NoError(t, err)
-		assert.True(t, exists)
-		assert.Equal(t, named, got)
-	})
-
-	t.Run("falls back to kind match when unnamed", func(t *testing.T) {
-		t.Parallel()
-		temp := t.TempDir()
-		path := filepath.Join(temp, "not-kustomization.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("kind: Kustomization\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{}, logger)
-
-		got, exists, err := proc.pickKustomizationPath(temp)
-		require.NoError(t, err)
-		assert.True(t, exists)
-		assert.Equal(t, path, got)
-	})
-
-	t.Run("defaults when missing", func(t *testing.T) {
-		t.Parallel()
-		temp := t.TempDir()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
-		proc := New(Options{}, logger)
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "custom.yaml"), []byte("kind: Kustomization\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
 
 		got, exists, err := proc.pickKustomizationPath(temp)
 		require.NoError(t, err)

@@ -2,9 +2,16 @@ package processor
 
 import "strings"
 
-// isKustomization reports whether name is a recognized kustomization file name.
+var kustomizationNames = []string{"kustomization.yaml", "kustomization.yml", "Kustomization"}
+
+// isKustomization reports whether name is a recognized Kustomize file name.
 func isKustomization(name string) bool {
-	return name == "kustomization.yaml" || name == "kustomization.yml"
+	for _, candidate := range kustomizationNames {
+		if name == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 // isYAML returns true when the file name has a YAML extension.

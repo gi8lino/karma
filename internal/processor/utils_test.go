@@ -19,6 +19,11 @@ func TestIsKustomization(t *testing.T) {
 		assert.True(t, isKustomization("kustomization.yml"))
 	})
 
+	t.Run("capital canonical name", func(t *testing.T) {
+		t.Parallel()
+		assert.True(t, isKustomization("Kustomization"))
+	})
+
 	t.Run("not kustomization", func(t *testing.T) {
 		t.Parallel()
 		assert.False(t, isKustomization("kustomization.txt"))

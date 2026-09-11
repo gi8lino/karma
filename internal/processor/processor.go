@@ -193,77 +193,31 @@ func (p *Processor) relPath(base, full string) string {
 	return filepath.ToSlash(rel)
 }
 
-// pickKustomizationPath finds an existing file or defaults to yaml.
+// pickKustomizationPath finds the canonical Kustomize file or defaults to yaml.
 func (p *Processor) pickKustomizationPath(dir string) (string, bool, error) {
-	candidates := []string{"kustomization.yaml", "kustomization.yml"}
-	for _, name := range candidates {
-		// Probe the candidate path to see if the file exists.
+	var matches []string
+	for _, name := range kustomizationNames {
 		full := filepath.Join(dir, name)
 		info, err := os.Stat(full)
 		if err == nil {
-			if info.IsDir() {
-				continue
+			if !info.IsDir() {
+				matches = append(matches, full)
 			}
-			return full, true, nil
+			continue
 		}
-
-		// Propagate unexpected errors rather than treating them as missing.
 		if !errors.Is(err, os.ErrNotExist) {
 			return "", false, err
 		}
 	}
 
-	// Fall back to a kustomization detected by kind.
-	kindPath, err := p.kustomizationByKind(dir)
-	if err != nil {
-		return "", false, err
+	switch len(matches) {
+	case 0:
+		return filepath.Join(dir, "kustomization.yaml"), false, nil
+	case 1:
+		return matches[0], true, nil
+	default:
+		return "", false, fmt.Errorf("multiple kustomization files in %s: %s", dir, strings.Join(matches, ", "))
 	}
-	if kindPath != "" {
-		return kindPath, true, nil
-	}
-
-	// If we didn't find a kustomization, create one.
-	return filepath.Join(dir, "kustomization.yaml"), false, nil
-}
-
-// kustomizationByKind returns the first YAML file whose kind is Kustomization.
-func (p *Processor) kustomizationByKind(dir string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if !p.opts.IncludeDot && strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		if !isYAML(entry.Name()) {
-			continue
-		}
-
-		fullPath := filepath.Join(dir, entry.Name())
-		match, err := hasKustomizationKind(fullPath)
-		if err != nil {
-			continue
-		}
-		if match {
-			return fullPath, nil
-		}
-	}
-
-	return "", nil
-}
-
-// hasKustomizationKind reports whether the YAML file declares kind: Kustomization.
-func hasKustomizationKind(path string) (bool, error) {
-	kind, err := readKustomizeKind(path)
-	if err != nil {
-		return false, err
-	}
-	return kind == "Kustomization", nil
 }
 
 // readKustomizeKind extracts the first non-empty kind from a YAML file.
