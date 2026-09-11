@@ -251,14 +251,14 @@ func (p *Processor) updateKustomization(
 	dirEntries, fileEntries []string,
 ) (updated bool, order, final []string, stats ResourceStats, err error) {
 	// Load or initialize the target YAML document.
-	root, seq, order, nodes, err := p.loadKustomization(path, exists)
+	root, seq, order, nodes, structureChanged, err := p.loadKustomization(path, exists)
 	if err != nil {
 		return false, nil, nil, ResourceStats{}, err
 	}
 
 	// Build the canonical resource order.
 	final = p.mergeResources(order, dirEntries, fileEntries)
-	if slices.Equal(final, order) {
+	if exists && !structureChanged && slices.Equal(final, order) {
 		return false, order, final, ResourceStats{}, nil
 	}
 	added, removed := diffEntries(order, final)
@@ -433,117 +433,133 @@ func (p *Processor) logUpdate(path string, stats ResourceStats, order, final []s
 func (p *Processor) loadKustomization(
 	path string,
 	exists bool,
-) (root *yaml.Node, seq *yaml.Node, order []string, nodes map[string]*yaml.Node, err error) {
+) (root *yaml.Node, seq *yaml.Node, order []string, nodes map[string]*yaml.Node, structureChanged bool, err error) {
 	root = &yaml.Node{}
 
 	if exists {
-		// Read the existing node tree to preserve comments.
-		var data []byte
-		data, err = os.ReadFile(path)
-		if err != nil {
-			return nil, nil, nil, nil, err
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil, nil, nil, nil, false, readErr
 		}
-		err = yaml.Unmarshal(data, root)
-		if err != nil {
-			return nil, nil, nil, nil, err
+		if len(bytes.TrimSpace(data)) > 0 {
+			if err := yaml.Unmarshal(data, root); err != nil {
+				return nil, nil, nil, nil, false, fmt.Errorf("decode %s: %w", path, err)
+			}
 		}
 	}
 
-	// Ensure the node is treated as a document.
-	if root.Kind != yaml.DocumentNode {
+	if root.Kind == 0 {
 		root.Kind = yaml.DocumentNode
+		root.Content = []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}
+	}
+	if root.Kind != yaml.DocumentNode || len(root.Content) != 1 {
+		return nil, nil, nil, nil, false, fmt.Errorf("%s: kustomization must be a single YAML document", path)
+	}
+	mapNode := root.Content[0]
+	if mapNode.Kind != yaml.MappingNode || len(mapNode.Content)%2 != 0 {
+		return nil, nil, nil, nil, false, fmt.Errorf("%s: kustomization root must be a YAML mapping", path)
 	}
 
-	// Initialize an empty mapping if the document was empty.
-	if len(root.Content) == 0 {
-		root.Content = []*yaml.Node{{Kind: yaml.MappingNode}}
+	headerChanged, err := ensureHeader(mapNode)
+	if err != nil {
+		return nil, nil, nil, nil, false, fmt.Errorf("%s: %w", path, err)
 	}
 
-	// Normalize the first child to a mapping node.
-	if root.Content[0].Kind != yaml.MappingNode {
-		root.Content[0].Kind = yaml.MappingNode
+	var resourcesChanged bool
+	seq, order, nodes, resourcesChanged, err = ensureResourcesSeq(root)
+	if err != nil {
+		return nil, nil, nil, nil, false, fmt.Errorf("%s: %w", path, err)
 	}
-
-	ensureHeader(root.Content[0])
-
-	seq, order, nodes, err = ensureResourcesSeq(root)
-	return root, seq, order, nodes, err
+	return root, seq, order, nodes, headerChanged || resourcesChanged, nil
 }
 
-// ensureResourcesSeq guarantees the resources block exists.
-func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes map[string]*yaml.Node, err error) {
+// ensureResourcesSeq guarantees the resources block exists without coercing
+// an existing value into a different YAML type.
+func ensureResourcesSeq(root *yaml.Node) (seq *yaml.Node, order []string, nodes map[string]*yaml.Node, changed bool, err error) {
 	mapNode := root.Content[0]
 	for i := 0; i < len(mapNode.Content); i += 2 {
-		// Iterate key/value pairs, keeping resources when found.
-		if i+1 >= len(mapNode.Content) {
-			break
-		}
-
 		key := mapNode.Content[i]
-		if key.Value == "resources" {
-			// Stop at the first resources entry so it can be reused.
+		if key.Kind == yaml.ScalarNode && key.Value == "resources" {
 			seq = mapNode.Content[i+1]
 			break
 		}
 	}
 
-	// Create a resources sequence if none exists yet.
 	if seq == nil {
-		seq = &yaml.Node{Kind: yaml.SequenceNode}
+		changed = true
+		seq = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "resources", Tag: "!!str"}
 		mapNode.Content = append(mapNode.Content, keyNode, seq)
 	}
-
-	// Normalize the entry to a sequence node before usage.
 	if seq.Kind != yaml.SequenceNode {
-		seq.Kind = yaml.SequenceNode
+		return nil, nil, nil, false, fmt.Errorf("resources must be a YAML sequence")
 	}
 
-	nodes, order = collectExistingResources(seq)
-	return seq, order, nodes, err
+	nodes, order, err = collectExistingResources(seq)
+	return seq, order, nodes, changed, err
 }
 
-// ensureHeader injects the canonical header keys at the top when missing.
-func ensureHeader(mapNode *yaml.Node) {
-	// Detect if a header already exists; if so, leave it untouched.
+// ensureHeader injects missing canonical header keys and validates existing
+// values. Existing values are never silently rewritten.
+func ensureHeader(mapNode *yaml.Node) (bool, error) {
+	const apiVersion = "kustomize.config.k8s.io/v1beta1"
+
+	hasAPIVersion := false
+	hasKind := false
 	for i := 0; i < len(mapNode.Content); i += 2 {
-		key := mapNode.Content[i].Value
-		if key == "apiVersion" || key == "kind" {
-			return
+		key, value := mapNode.Content[i], mapNode.Content[i+1]
+		if key.Kind != yaml.ScalarNode {
+			return false, fmt.Errorf("mapping keys must be scalars")
+		}
+		switch key.Value {
+		case "apiVersion":
+			hasAPIVersion = true
+			if value.Kind != yaml.ScalarNode || value.Value != apiVersion {
+				return false, fmt.Errorf("apiVersion must be %q", apiVersion)
+			}
+		case "kind":
+			hasKind = true
+			if value.Kind != yaml.ScalarNode || value.Value != "Kustomization" {
+				return false, fmt.Errorf("kind must be %q", "Kustomization")
+			}
 		}
 	}
 
-	header := []*yaml.Node{
-		{Kind: yaml.ScalarNode, Value: "apiVersion", Tag: "!!str"},
-		{Kind: yaml.ScalarNode, Value: "kustomize.config.k8s.io/v1beta1", Tag: "!!str"},
-		{Kind: yaml.ScalarNode, Value: "kind", Tag: "!!str"},
-		{Kind: yaml.ScalarNode, Value: "Kustomization", Tag: "!!str"},
+	header := make([]*yaml.Node, 0, 4)
+	if !hasAPIVersion {
+		header = append(header,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "apiVersion", Tag: "!!str"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: apiVersion, Tag: "!!str"},
+		)
 	}
-
-	// Prepend the header nodes so the header keys appear first in the document.
-	mapNode.Content = append(header, mapNode.Content...)
+	if !hasKind {
+		header = append(header,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "kind", Tag: "!!str"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "Kustomization", Tag: "!!str"},
+		)
+	}
+	if len(header) > 0 {
+		mapNode.Content = append(header, mapNode.Content...)
+		return true, nil
+	}
+	return false, nil
 }
 
-// collectExistingResources indexes the existing sequence nodes.
-func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, order []string) {
+// collectExistingResources indexes scalar resource entries.
+func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, order []string, err error) {
 	nodes = make(map[string]*yaml.Node, len(seq.Content))
 	order = make([]string, 0, len(seq.Content))
 
 	for _, node := range seq.Content {
-		// Ignore anything that is not a scalar resource entry.
 		if node.Kind != yaml.ScalarNode {
-			continue
+			return nil, nil, fmt.Errorf("resources entries must be scalar strings")
 		}
-
-		// Record the first occurrence and map the node for reuse.
 		if _, exists := nodes[node.Value]; !exists {
 			order = append(order, node.Value)
 		}
-
 		nodes[node.Value] = node
 	}
-
-	return nodes, order
+	return nodes, order, nil
 }
 
 // mergeResources produces the canonical ordering for resources.

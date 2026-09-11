@@ -236,6 +236,39 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		assert.Contains(t, string(data), "kind")
 	})
 
+	t.Run("writes missing header even when resources are unchanged", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("resources:\n  - app.yaml\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		updated, _, _, _, err := proc.updateKustomization(path, true, nil, []string{"app.yaml"})
+		require.NoError(t, err)
+		assert.True(t, updated)
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "apiVersion: kustomize.config.k8s.io/v1beta1")
+		assert.Contains(t, string(data), "kind: Kustomization")
+	})
+
+	t.Run("creates an empty missing kustomization", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		updated, _, _, _, err := proc.updateKustomization(path, false, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, updated)
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "apiVersion:")
+		assert.Contains(t, string(data), "kind: Kustomization")
+		assert.Contains(t, string(data), "resources:")
+	})
+
 	t.Run("returns false when unchanged", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
@@ -297,12 +330,36 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
-		root, seq, order, nodes, err := proc.loadKustomization(path, true)
+		root, seq, order, nodes, _, err := proc.loadKustomization(path, true)
 		require.NoError(t, err)
 		require.NotNil(t, root)
 		require.NotNil(t, seq)
 		require.NotNil(t, nodes)
 		assert.Contains(t, order, "kept")
+	})
+
+	t.Run("rejects non-mapping root", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("- one\n- two\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		_, _, _, _, _, err := proc.loadKustomization(path, true)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "root must be a YAML mapping")
+	})
+
+	t.Run("rejects non-sequence resources", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("resources: app.yaml\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		_, _, _, _, _, err := proc.loadKustomization(path, true)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resources must be a YAML sequence")
 	})
 
 	t.Run("initializes missing document", func(t *testing.T) {
@@ -312,7 +369,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
-		root, seq, order, nodes, err := proc.loadKustomization(path, false)
+		root, seq, order, nodes, _, err := proc.loadKustomization(path, false)
 		require.NoError(t, err)
 		require.NotNil(t, root)
 		require.NotNil(t, seq)
@@ -332,7 +389,7 @@ func TestEnsureResourcesSeq(t *testing.T) {
 				{Kind: yaml.MappingNode},
 			},
 		}
-		seq, order, _, err := ensureResourcesSeq(root)
+		seq, order, _, _, err := ensureResourcesSeq(root)
 		require.NoError(t, err)
 		require.NotNil(t, seq)
 		assert.Empty(t, order)
@@ -351,7 +408,7 @@ func TestEnsureResourcesSeq(t *testing.T) {
 				},
 			},
 		}
-		seq, order, _, err := ensureResourcesSeq(root)
+		seq, order, _, _, err := ensureResourcesSeq(root)
 		require.NoError(t, err)
 		assert.Equal(t, seqNode, seq)
 		assert.Empty(t, order)
@@ -361,23 +418,29 @@ func TestEnsureResourcesSeq(t *testing.T) {
 func TestCollectExistingResources(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexes only scalar nodes", func(t *testing.T) {
+	t.Run("indexes scalar nodes", func(t *testing.T) {
 		t.Parallel()
 		seq := &yaml.Node{
 			Kind: yaml.SequenceNode,
 			Content: []*yaml.Node{
 				{Kind: yaml.ScalarNode, Value: "one"},
 				{Kind: yaml.ScalarNode, Value: "two"},
-				{Kind: yaml.MappingNode},
 				{Kind: yaml.ScalarNode, Value: "one"},
 			},
 		}
-		nodes, order := collectExistingResources(seq)
+		nodes, order, err := collectExistingResources(seq)
+		require.NoError(t, err)
 		require.Len(t, order, 2)
-		assert.Equal(t, []*yaml.Node{{Kind: yaml.ScalarNode, Value: "one"}}, []*yaml.Node{nodes["one"]})
 		assert.Equal(t, "one", order[0])
 		assert.Equal(t, "two", order[1])
 		assert.Len(t, nodes, 2)
+	})
+
+	t.Run("rejects structured resource entries", func(t *testing.T) {
+		t.Parallel()
+		seq := &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{{Kind: yaml.MappingNode}}}
+		_, _, err := collectExistingResources(seq)
+		require.Error(t, err)
 	})
 }
 
