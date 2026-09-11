@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"os"
 	"regexp"
 	"testing"
 
@@ -23,7 +24,8 @@ func TestProcessing(t *testing.T) {
 		out := &bytes.Buffer{}
 		logger := New(out, nil, LevelInfo)
 		logger.Processing("base", "path", "/tmp")
-		assert.Contains(t, stripANSI(t, out.String()), "[PROCESS ]")
+		assert.Contains(t, out.String(), "[PROCESS ]")
+		assert.NotContains(t, out.String(), "\x1b[")
 	})
 }
 
@@ -151,6 +153,7 @@ func TestResourceDiff(t *testing.T) {
 		logger := New(out, nil, LevelVerbose)
 		logger.ResourceDiff([]string{"app", "old"}, []string{"app", "new"})
 		stripped := stripANSI(t, out.String())
+		assert.NotContains(t, out.String(), "\x1b[")
 		require.Contains(t, stripped, "+  - \"new\"")
 		require.Contains(t, stripped, "-  - \"old\"")
 	})
@@ -216,6 +219,24 @@ func TestDiffStrings(t *testing.T) {
 		removed, added := diffStrings([]string{"a", "a", "b"}, []string{"a", "c", "a"})
 		assert.ElementsMatch(t, []string{"b"}, removed)
 		assert.ElementsMatch(t, []string{"c"}, added)
+	})
+}
+
+func TestShouldColor(t *testing.T) {
+	t.Run("buffer is plain", func(t *testing.T) {
+		assert.False(t, shouldColor(&bytes.Buffer{}))
+	})
+
+	t.Run("regular file is plain", func(t *testing.T) {
+		file, err := os.CreateTemp(t.TempDir(), "log-*")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = file.Close() })
+		assert.False(t, shouldColor(file))
+	})
+
+	t.Run("no color disables ansi", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "1")
+		assert.False(t, shouldColor(os.Stdout))
 	})
 }
 

@@ -3,6 +3,7 @@ package logging
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -155,11 +156,20 @@ func (l *Logger) ResourceDiff(old, new []string) {
 	if len(removed) == 0 && len(added) == 0 {
 		return
 	}
+	useColor := shouldColor(l.out)
 	for _, line := range removed {
-		fmt.Fprintf(l.out, "%s%s-  - %q%s\n", colorRed, diffIndent, line, colorReset) // nolint:errcheck
+		if useColor {
+			fmt.Fprintf(l.out, "%s%s-  - %q%s\n", colorRed, diffIndent, line, colorReset) // nolint:errcheck
+			continue
+		}
+		fmt.Fprintf(l.out, "%s-  - %q\n", diffIndent, line) // nolint:errcheck
 	}
 	for _, line := range added {
-		fmt.Fprintf(l.out, "%s%s+  - %q%s\n", colorGreen, diffIndent, line, colorReset) // nolint:errcheck
+		if useColor {
+			fmt.Fprintf(l.out, "%s%s+  - %q%s\n", colorGreen, diffIndent, line, colorReset) // nolint:errcheck
+			continue
+		}
+		fmt.Fprintf(l.out, "%s+  - %q\n", diffIndent, line) // nolint:errcheck
 	}
 }
 
@@ -210,7 +220,11 @@ func (l *Logger) log(w io.Writer, level LogLevel, tag string, builder func() []s
 // Write renders a formatted log line to the configured output stream.
 func (l *Logger) write(w io.Writer, tag string, kv []string) {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck
+	if shouldColor(w) {
+		fmt.Fprintf(&b, "%s[%-8s]%s", tagColors[tag], tag, colorReset) // nolint:errcheck
+	} else {
+		fmt.Fprintf(&b, "[%-8s]", tag) // nolint:errcheck
+	}
 	for i := 0; i < len(kv); i += 2 {
 		if i+1 < len(kv) {
 			fmt.Fprintf(&b, " %s=%s", kv[i], kv[i+1]) // nolint:errcheck
@@ -219,4 +233,21 @@ func (l *Logger) write(w io.Writer, tag string, kv []string) {
 		fmt.Fprintf(&b, " %s", kv[i]) // nolint:errcheck
 	}
 	fmt.Fprintln(w, b.String()) // nolint:errcheck
+}
+
+// shouldColor reports whether ANSI colors are appropriate for w. Colors are
+// disabled for redirected output, non-files, dumb terminals, and NO_COLOR.
+func shouldColor(w io.Writer) bool {
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	file, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }

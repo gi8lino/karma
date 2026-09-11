@@ -30,6 +30,7 @@ karma [options] <base-dir>...
 - `-v` adds the resource diff (`-  - foo` / `+  - bar` lines).
 - `-vv` ups the level so `[NO-OP]` and `[SKIPPING]` appear as well.
 - `--mute`, `-q` shuts logging off entirely.
+- ANSI colors are used only for terminal output; redirected output is plain text and `NO_COLOR` is respected.
 
 ## Features
 
