@@ -42,7 +42,9 @@ karma [options] <base-dir>...
 ## Testing
 
 ```sh
-make test
+make fmt        # Format source files.
+make fmt-check  # Verify formatting without modifying files.
+make test       # Run fmt-check, vet, and unit tests.
 ```
 
 ## Releases

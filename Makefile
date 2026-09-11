@@ -10,7 +10,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION ?= v2.13.2
+GOLANGCI_LINT_VERSION ?= v2.6.1
 
 # Default tag prefix. Override with VERSION_PREFIX= if you do not want one.
 VERSION_PREFIX ?= v
@@ -61,15 +61,19 @@ run: ## Run karma. Override KARMA_ARGS to pass command-line arguments.
 	go run ./cmd/karma $(KARMA_ARGS)
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
+fmt: ## Format Go source files.
 	go fmt ./...
+
+.PHONY: fmt-check
+fmt-check: ## Fail when Go source files need formatting.
+	@files="$$(gofmt -l .)"; 	if [ -n "$$files" ]; then 		echo "Go files need formatting:"; 		echo "$$files"; 		exit 1; 	fi
 
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: fmt vet ## Run unit tests.
+test: fmt-check vet ## Run unit tests without modifying the working tree.
 	go test -covermode=atomic -count=1 -parallel=4 -timeout=5m ./...
 
 .PHONY: cover
