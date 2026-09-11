@@ -9,12 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/gi8lino/karma/internal/gitignore"
 	"github.com/gi8lino/karma/internal/logging"
-	"github.com/gi8lino/karma/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -570,10 +568,12 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []string) []string {
 	dirs := p.ensureDirPrefix(dirEntries)
 	dirs = p.ensureDirSuffix(dirs)
-	files := append([]string(nil), fileEntries...) // Create a copy of the existing resources.
+	files := slices.Clone(fileEntries)
 
-	sort.Strings(dirs)
-	sort.Strings(files)
+	slices.Sort(dirs)
+	dirs = slices.Compact(dirs)
+	slices.Sort(files)
+	files = slices.Compact(files)
 
 	// Preserve entries Karma cannot positively identify as direct, locally managed
 	// resources. This keeps references such as ../base and remote URLs intact.
@@ -583,7 +583,8 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 			unmanaged = append(unmanaged, value)
 		}
 	}
-	sort.Strings(unmanaged)
+	slices.Sort(unmanaged)
+	unmanaged = slices.Compact(unmanaged)
 
 	order := normalizeResourceOrder(p.opts.ResourceOrder)
 
@@ -599,7 +600,7 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 		}
 	}
 
-	return utils.DedupPreserve(final)
+	return final
 }
 
 // ensureDirSuffix appends slash suffixes when configured.

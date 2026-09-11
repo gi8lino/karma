@@ -1,17 +1,15 @@
 package processor
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 var kustomizationNames = []string{"kustomization.yaml", "kustomization.yml", "Kustomization"}
 
 // isKustomization reports whether name is a recognized Kustomize file name.
 func isKustomization(name string) bool {
-	for _, candidate := range kustomizationNames {
-		if name == candidate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(kustomizationNames, name)
 }
 
 // isYAML returns true when the file name has a YAML extension.

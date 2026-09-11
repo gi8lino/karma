@@ -1,6 +1,9 @@
 package processor
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 const (
 	resourceGroupRemote = "remote"
@@ -16,9 +19,7 @@ var defaultResourceOrder = []string{
 
 // DefaultResourceOrder returns the built-in resource ordering.
 func DefaultResourceOrder() []string {
-	out := make([]string, len(defaultResourceOrder))
-	copy(out, defaultResourceOrder)
-	return out
+	return slices.Clone(defaultResourceOrder)
 }
 
 // ParseResourceOrder builds a resource group order from the provided CSV, appending missing groups.
@@ -35,8 +36,7 @@ func normalizeResourceOrder(parts []string) []string {
 		return DefaultResourceOrder()
 	}
 
-	seen := map[string]struct{}{}                       // Map for uniqueness
-	out := make([]string, 0, len(defaultResourceOrder)) // Slice to keep order
+	out := make([]string, 0, len(defaultResourceOrder))
 
 	// Parse the provided value and add each group.
 	for _, part := range parts {

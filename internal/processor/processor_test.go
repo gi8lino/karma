@@ -208,7 +208,6 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 	t.Parallel()
 
 	for _, name := range kustomizationNames {
-		name := name
 		t.Run("selects "+name, func(t *testing.T) {
 			t.Parallel()
 			temp := t.TempDir()
