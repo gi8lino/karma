@@ -11,19 +11,20 @@ import (
 
 // Config holds parsed command-line options.
 type Config struct {
-	BaseDirs         []string
-	SkipPatterns     []string
-	OpaquePatterns   []string
-	PreservePatterns []string
-	Verbosity        int
-	UseGitIgnore     bool
-	IncludeDot       bool
-	Mute             bool
-	AddDirSuffix     bool
-	AddDirPrefix     bool
-	DryRun           bool
-	Check            bool
-	ResourceOrder    []string
+	BaseDirs               []string
+	SkipPatterns           []string
+	OpaquePatterns         []string
+	PreservePatterns       []string
+	PreserveKustomizations []string
+	Verbosity              int
+	UseGitIgnore           bool
+	IncludeDot             bool
+	Mute                   bool
+	AddDirSuffix           bool
+	AddDirPrefix           bool
+	DryRun                 bool
+	Check                  bool
+	ResourceOrder          []string
 }
 
 // Parse builds user configuration from CLI args.
@@ -41,6 +42,8 @@ func Parse(version string, args []string) (Config, error) {
 	fs.StringSliceVar(&cfg.OpaquePatterns, "opaque", []string{}, "Keep matching directories as resources without descending into them.").
 		Value()
 	fs.StringSliceVar(&cfg.PreservePatterns, "preserve", []string{}, "Keep matching directories and descend, but do not rewrite their own kustomization.").
+		Value()
+	fs.StringSliceVar(&cfg.PreserveKustomizations, "preserve-kustomization", []string{}, "Do not rewrite the listed Kustomization files. Paths are relative to each base directory.").
 		Value()
 
 	var noGitIgnore bool

@@ -13,6 +13,7 @@ karma [options] <base-dir>...
 - `-s`, `--skip` – Completely ignore matching resources. Accepts comma-separated patterns and wildcards.
 - `--opaque` – Keep matching directories as resources but do not descend into them.
 - `--preserve` – Keep matching directories as resources and descend into them, but do not rewrite their own kustomization.
+- `--preserve-kustomization` – Do not rewrite listed Kustomization files. Paths are relative to each base directory; repeat the flag or pass a comma-separated list for multiple files.
 - `-v` – Increase verbosity to show resource diffs.
 - `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
 - `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.

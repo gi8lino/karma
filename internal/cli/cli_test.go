@@ -18,6 +18,7 @@ func TestParse(t *testing.T) {
 			"-s", "patch-*",
 			"--opaque", "vendor",
 			"--preserve", "managed",
+			"--preserve-kustomization", "kustomization.yaml,flux/config/kustomization.yaml",
 			"--no-gitignore",
 			"--include-dot",
 			"--suffix",
@@ -30,6 +31,7 @@ func TestParse(t *testing.T) {
 		assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
 		assert.Equal(t, []string{"vendor"}, cfg.OpaquePatterns)
 		assert.Equal(t, []string{"managed"}, cfg.PreservePatterns)
+		assert.Equal(t, []string{"kustomization.yaml", "flux/config/kustomization.yaml"}, cfg.PreserveKustomizations)
 		require.False(t, cfg.UseGitIgnore)
 		require.True(t, cfg.IncludeDot)
 		require.True(t, cfg.AddDirSuffix)
@@ -54,6 +56,7 @@ func TestParse(t *testing.T) {
 		assert.Empty(t, cfg.SkipPatterns)
 		assert.Empty(t, cfg.OpaquePatterns)
 		assert.Empty(t, cfg.PreservePatterns)
+		assert.Empty(t, cfg.PreserveKustomizations)
 		assert.Zero(t, cfg.Verbosity)
 		require.True(t, cfg.UseGitIgnore)
 		require.False(t, cfg.IncludeDot)

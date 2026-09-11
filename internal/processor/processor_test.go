@@ -43,6 +43,64 @@ func TestProcessorProcess(t *testing.T) {
 		assert.Contains(t, string(data), "app.yaml")
 	})
 
+	t.Run("preserves root kustomization and still processes children", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		rootKustomization := filepath.Join(temp, "kustomization.yaml")
+		original := []byte("this: [is not valid yaml\n")
+		require.NoError(t, os.WriteFile(rootKustomization, original, 0o644))
+
+		child := filepath.Join(temp, "app")
+		require.NoError(t, os.Mkdir(child, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(child, "deployment.yaml"), []byte("kind: Deployment\n"), 0o644))
+
+		proc := New(Options{
+			PreserveKustomizations: []string{"kustomization.yaml"},
+		}, logging.New(io.Discard, logging.LevelInfo))
+		stats, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+		assert.Equal(t, 1, stats.Updated)
+
+		got, err := os.ReadFile(rootKustomization)
+		require.NoError(t, err)
+		assert.Equal(t, original, got)
+
+		childData, err := os.ReadFile(filepath.Join(child, "kustomization.yaml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(childData), "deployment.yaml")
+	})
+
+	t.Run("preserves nested kustomization by exact relative path", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		config := filepath.Join(temp, "flux", "config")
+		nested := filepath.Join(config, "nested")
+		require.NoError(t, os.MkdirAll(nested, 0o755))
+
+		kustomization := filepath.Join(config, "kustomization.yaml")
+		original := []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - manually-managed.yaml
+`)
+		require.NoError(t, os.WriteFile(kustomization, original, 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(nested, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		proc := New(Options{
+			PreserveKustomizations: []string{"flux/config/kustomization.yaml"},
+		}, logging.New(io.Discard, logging.LevelInfo))
+		_, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+
+		got, err := os.ReadFile(kustomization)
+		require.NoError(t, err)
+		assert.Equal(t, original, got)
+
+		nestedData, err := os.ReadFile(filepath.Join(nested, "kustomization.yaml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(nestedData), "app.yaml")
+	})
+
 	t.Run("reuses up-to-date kustomization", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()

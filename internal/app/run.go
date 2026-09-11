@@ -38,6 +38,7 @@ func Run(ctx context.Context, version string, args []string, stdOut io.Writer) e
 		"skip", fmt.Sprintf("%v", cfg.SkipPatterns),
 		"opaque", fmt.Sprintf("%v", cfg.OpaquePatterns),
 		"preserve", fmt.Sprintf("%v", cfg.PreservePatterns),
+		"preserve-kustomization", fmt.Sprintf("%v", cfg.PreserveKustomizations),
 		"gitignore", fmt.Sprintf("%v", cfg.UseGitIgnore),
 		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
 		"dir-suffix", fmt.Sprintf("%v", cfg.AddDirSuffix),
@@ -49,15 +50,16 @@ func Run(ctx context.Context, version string, args []string, stdOut io.Writer) e
 
 	// Create the processor options.
 	opts := processor.Options{
-		Skip:          cfg.SkipPatterns,
-		Opaque:        cfg.OpaquePatterns,
-		Preserve:      cfg.PreservePatterns,
-		UseGitIgnore:  cfg.UseGitIgnore,
-		IncludeDot:    cfg.IncludeDot,
-		AddDirSuffix:  cfg.AddDirSuffix,
-		AddDirPrefix:  cfg.AddDirPrefix,
-		DryRun:        cfg.DryRun || cfg.Check,
-		ResourceOrder: cfg.ResourceOrder,
+		Skip:                   cfg.SkipPatterns,
+		Opaque:                 cfg.OpaquePatterns,
+		Preserve:               cfg.PreservePatterns,
+		PreserveKustomizations: cfg.PreserveKustomizations,
+		UseGitIgnore:           cfg.UseGitIgnore,
+		IncludeDot:             cfg.IncludeDot,
+		AddDirSuffix:           cfg.AddDirSuffix,
+		AddDirPrefix:           cfg.AddDirPrefix,
+		DryRun:                 cfg.DryRun || cfg.Check,
+		ResourceOrder:          cfg.ResourceOrder,
 	}
 
 	// Process each base directory with the same immutable processor configuration.

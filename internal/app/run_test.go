@@ -55,6 +55,27 @@ func TestRun(t *testing.T) {
 		assert.Contains(t, out.String(), "v9.9.9")
 	})
 
+	t.Run("preserves selected kustomization files", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		rootKustomization := filepath.Join(temp, "kustomization.yaml")
+		original := []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - manual.yaml
+`)
+		require.NoError(t, os.WriteFile(rootKustomization, original, 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--preserve-kustomization", "kustomization.yaml", temp}, &out)
+		require.NoError(t, err)
+
+		got, err := os.ReadFile(rootKustomization)
+		require.NoError(t, err)
+		assert.Equal(t, original, got)
+	})
+
 	t.Run("skips files matching patterns", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()

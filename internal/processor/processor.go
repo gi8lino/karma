@@ -18,15 +18,16 @@ import (
 
 // Options describe how the processor behaves for each tree.
 type Options struct {
-	ResourceOrder []string
-	Skip          []string
-	Opaque        []string
-	Preserve      []string
-	UseGitIgnore  bool
-	IncludeDot    bool
-	AddDirSuffix  bool
-	AddDirPrefix  bool
-	DryRun        bool
+	ResourceOrder          []string
+	Skip                   []string
+	Opaque                 []string
+	Preserve               []string
+	PreserveKustomizations []string
+	UseGitIgnore           bool
+	IncludeDot             bool
+	AddDirSuffix           bool
+	AddDirPrefix           bool
+	DryRun                 bool
 }
 
 // ResourceStats holds the results of processing a tree.
@@ -80,8 +81,9 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 	if pathErr != nil {
 		return ResourceStats{}, pathErr
 	}
+	preserveKustomization := p.isPreservedKustomization(base, kustomizationPath)
 	component := false
-	if exists {
+	if exists && !preserveKustomization {
 		kind, kindErr := readKustomizeKind(kustomizationPath)
 		if kindErr != nil {
 			return ResourceStats{}, kindErr
@@ -89,16 +91,30 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 		component = strings.EqualFold(kind, "Component")
 	}
 
+	// A preserved Kustomization is outside Karma's ownership, so don't parse it
+	// while deciding how to traverse the directory.
+	scanKustomizationPath := kustomizationPath
+	if preserveKustomization {
+		scanKustomizationPath = ""
+	}
+
 	// Load the entries once so scanEntries can handle ignores and skip logic.
-	dirEntries, fileEntries, subdirs, err := p.scanEntries(ctx, dir, base, matcher, kustomizationPath)
+	dirEntries, fileEntries, subdirs, err := p.scanEntries(ctx, dir, base, matcher, scanKustomizationPath)
 	if err != nil {
 		return ResourceStats{}, err
 	}
 
 	var stats ResourceStats
 
-	// Rewrite the kustomization file if it changed.
-	fileStats, err := p.applyKustomization(dir, kustomizationPath, exists, dirEntries, fileEntries, skipUpdate || component)
+	// Rewrite the kustomization file if it changed, unless this exact file is preserved.
+	fileStats, err := p.applyKustomization(
+		dir,
+		kustomizationPath,
+		exists,
+		dirEntries,
+		fileEntries,
+		skipUpdate || component || preserveKustomization,
+	)
 	if err != nil {
 		return ResourceStats{}, err
 	}
@@ -212,6 +228,30 @@ func (p *Processor) relPath(base, full string) string {
 		return filepath.Base(full)
 	}
 	return filepath.ToSlash(rel)
+}
+
+// isPreservedKustomization reports whether path is explicitly excluded from
+// writes. Entries are exact slash-separated paths relative to the processing
+// base directory.
+func (p *Processor) isPreservedKustomization(base, file string) bool {
+	rel, err := filepath.Rel(base, file)
+	if err != nil {
+		return false
+	}
+	rel = filepath.ToSlash(filepath.Clean(rel))
+
+	for _, candidate := range p.opts.PreserveKustomizations {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		candidate = filepath.ToSlash(filepath.Clean(candidate))
+		candidate = strings.TrimPrefix(candidate, "./")
+		if rel == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 // pickKustomizationPath finds the canonical Kustomize file or defaults to yaml.
