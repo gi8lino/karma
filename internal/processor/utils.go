@@ -17,3 +17,19 @@ func isYAML(name string) bool {
 func isRemoteResource(entry string) bool {
 	return strings.HasPrefix(entry, "http://") || strings.HasPrefix(entry, "https://")
 }
+
+// isManagedLocalResource reports whether Karma owns a direct local resource
+// entry. Paths that point outside or below the current directory are preserved
+// as opaque user-managed references.
+func isManagedLocalResource(entry string) bool {
+	if entry == "" || isRemoteResource(entry) {
+		return false
+	}
+
+	entry = strings.TrimPrefix(entry, "./")
+	entry = strings.TrimSuffix(entry, "/")
+	if entry == "" || entry == ".." || strings.HasPrefix(entry, "../") {
+		return false
+	}
+	return !strings.ContainsAny(entry, `/\`)
+}

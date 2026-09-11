@@ -30,7 +30,7 @@ karma [options] <base-dir>...
 ## Features
 
 - Writes only the `resources` block, preserving other fields and comments.
-- Supports remote resources, optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
+- Preserves remote and non-direct resource references, supports optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
 - Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
 - Plans and updates per base directory, reporting a final summary.
 

@@ -62,3 +62,13 @@ func TestIsRemoteResource(t *testing.T) {
 		assert.False(t, isRemoteResource("file://local"))
 	})
 }
+
+func TestIsManagedLocalResource(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, isManagedLocalResource("app.yaml"))
+	assert.True(t, isManagedLocalResource("./app/"))
+	assert.False(t, isManagedLocalResource("../base"))
+	assert.False(t, isManagedLocalResource("nested/base"))
+	assert.False(t, isManagedLocalResource("https://example.com/base"))
+}

@@ -409,6 +409,23 @@ func TestCollectExistingResources(t *testing.T) {
 	})
 }
 
+func TestMergeResourcesPreservesUnmanagedReferences(t *testing.T) {
+	t.Parallel()
+
+	proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+	final := proc.mergeResources(
+		[]string{"../base", "nested/shared", "https://example.com/base", "removed.yaml"},
+		nil,
+		[]string{"app.yaml"},
+	)
+
+	assert.Contains(t, final, "../base")
+	assert.Contains(t, final, "nested/shared")
+	assert.Contains(t, final, "https://example.com/base")
+	assert.Contains(t, final, "app.yaml")
+	assert.NotContains(t, final, "removed.yaml")
+}
+
 func TestMergeResourcesOrders(t *testing.T) {
 	t.Parallel()
 
