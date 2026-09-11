@@ -89,7 +89,7 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 	}
 
 	// Load the entries once so scanEntries can handle ignores and skip logic.
-	dirEntries, fileEntries, subdirs, err := p.scanEntries(dir, base, matcher, kustomizationPath)
+	dirEntries, fileEntries, subdirs, err := p.scanEntries(ctx, dir, base, matcher, kustomizationPath)
 	if err != nil {
 		return ResourceStats{}, err
 	}
@@ -125,6 +125,7 @@ func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitig
 //	fileEntries: YAML files within dir that belong in this kustomization,
 //	childDirs: metadata that controls how each subdirectory is traversed.
 func (p *Processor) scanEntries(
+	ctx context.Context,
 	dir, base string,
 	matcher gitignore.Matcher,
 	kustomizationPath string,
@@ -142,6 +143,10 @@ func (p *Processor) scanEntries(
 
 	// Walk entries so ignores and skip patterns are applied deterministically.
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, nil, err
+		}
+
 		fullPath := filepath.Join(dir, entry.Name())
 		if isKustomization(entry.Name()) || (kustomizationPath != "" && filepath.Clean(fullPath) == filepath.Clean(kustomizationPath)) {
 			continue

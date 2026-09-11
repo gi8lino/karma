@@ -42,7 +42,7 @@ make test
 
 ## Releases
 
-- Builds use [goreleaser](https://goreleaser.com/) targeting macOS (amd64/arm64) and Windows (amd64/arm64) binaries.
+- Builds use [goreleaser](https://goreleaser.com/) targeting Linux, macOS, and Windows on amd64 and arm64.
 
 ## License
 

@@ -16,6 +16,16 @@ import (
 func TestProcessorProcess(t *testing.T) {
 	t.Parallel()
 
+	t.Run("honors canceled context", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		_, err := proc.Process(ctx, t.TempDir())
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
 	t.Run("creates missing kustomization", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
@@ -158,7 +168,7 @@ func TestScanEntries(t *testing.T) {
 			IncludeDot: false,
 		}, logger)
 
-		dirEntries, fileEntries, childDirs, err := proc.scanEntries(temp, temp, nil, "")
+		dirEntries, fileEntries, childDirs, err := proc.scanEntries(context.Background(), temp, temp, nil, "")
 		require.NoError(t, err)
 		assert.Contains(t, dirEntries, "normal")
 		assert.Contains(t, dirEntries, "skipdir")

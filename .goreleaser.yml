@@ -20,4 +20,3 @@ builds:
     ldflags:
       - -s -w
       - -X main.Version={{ .Tag }}
-      - -X main.Commit={{ .FullCommit }}
