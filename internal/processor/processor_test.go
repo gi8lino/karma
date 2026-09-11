@@ -247,7 +247,7 @@ func TestScanEntries(t *testing.T) {
 
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(Options{
-			Skip:       []string{"skipdir/*"},
+			Opaque:     []string{"skipdir"},
 			IncludeDot: false,
 		}, logger)
 

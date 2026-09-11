@@ -11,17 +11,19 @@ import (
 
 // Config holds parsed command-line options.
 type Config struct {
-	BaseDirs      []string
-	SkipPatterns  []string
-	Verbosity     int
-	UseGitIgnore  bool
-	IncludeDot    bool
-	Mute          bool
-	AddDirSuffix  bool
-	AddDirPrefix  bool
-	DryRun        bool
-	Check         bool
-	ResourceOrder []string
+	BaseDirs         []string
+	SkipPatterns     []string
+	OpaquePatterns   []string
+	PreservePatterns []string
+	Verbosity        int
+	UseGitIgnore     bool
+	IncludeDot       bool
+	Mute             bool
+	AddDirSuffix     bool
+	AddDirPrefix     bool
+	DryRun           bool
+	Check            bool
+	ResourceOrder    []string
 }
 
 // Parse builds user configuration from CLI args.
@@ -29,14 +31,16 @@ func Parse(version string, args []string) (Config, error) {
 	fs := tinyflags.NewFlagSet("karma", tinyflags.ContinueOnError)
 	fs.Version(version)
 	fs.RequirePositional(1)
-	fs.Note("*) skip accepts `*` wildcards plus `/*` to ignore a directory's contents and " +
-		"`/**` to ignore the directory while still descending into its children.")
 
 	cfg := Config{}
 
 	// Selection
-	fs.StringSliceVar(&cfg.SkipPatterns, "skip", []string{}, "Skip resources (comma-separated). *").
+	fs.StringSliceVar(&cfg.SkipPatterns, "skip", []string{}, "Ignore matching resources completely (comma-separated, supports wildcards).").
 		Short("s").
+		Value()
+	fs.StringSliceVar(&cfg.OpaquePatterns, "opaque", []string{}, "Keep matching directories as resources without descending into them.").
+		Value()
+	fs.StringSliceVar(&cfg.PreservePatterns, "preserve", []string{}, "Keep matching directories and descend, but do not rewrite their own kustomization.").
 		Value()
 
 	var noGitIgnore bool

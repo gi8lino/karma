@@ -10,7 +10,9 @@ karma [options] <base-dir>...
 
 ## Flags
 
-- `-s`, `--skip` – Accepts comma-separated patterns; supports `*` wildcards, `/*` to skip a directory’s kustomization without entering it, and `/**` to skip the kustomization but still descend into its children (so those nested dirs can still be handled separately).
+- `-s`, `--skip` – Completely ignore matching resources. Accepts comma-separated patterns and wildcards.
+- `--opaque` – Keep matching directories as resources but do not descend into them.
+- `--preserve` – Keep matching directories as resources and descend into them, but do not rewrite their own kustomization.
 - `-v` – Increase verbosity to show resource diffs.
 - `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
 - `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.
@@ -32,7 +34,7 @@ karma [options] <base-dir>...
 ## Features
 
 - Writes only the `resources` block, preserving other fields and comments.
-- Preserves external resource references such as remote URLs and non-direct local paths, supports optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
+- Preserves external resource references such as remote URLs and non-direct local paths, supports optional directory suffixing, alphabetical ordering, and explicit `skip`, `opaque`, and `preserve` patterns.
 - Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
 - Plans and updates per base directory, reporting a final summary.
 - Supports non-mutating `--dry-run` previews and CI-friendly `--check` validation.

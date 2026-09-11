@@ -16,6 +16,8 @@ func TestParse(t *testing.T) {
 		cfg, err := Parse("1.0.0", []string{
 			"-s", ".img,dashboards",
 			"-s", "patch-*",
+			"--opaque", "vendor",
+			"--preserve", "managed",
 			"--no-gitignore",
 			"--include-dot",
 			"--suffix",
@@ -26,6 +28,8 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"foo"}, cfg.BaseDirs)
 		assert.Equal(t, []string{".img", "dashboards", "patch-*"}, cfg.SkipPatterns)
+		assert.Equal(t, []string{"vendor"}, cfg.OpaquePatterns)
+		assert.Equal(t, []string{"managed"}, cfg.PreservePatterns)
 		require.False(t, cfg.UseGitIgnore)
 		require.True(t, cfg.IncludeDot)
 		require.True(t, cfg.AddDirSuffix)
@@ -47,7 +51,9 @@ func TestParse(t *testing.T) {
 		cfg, err := Parse("1.0.0", []string{"bar"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"bar"}, cfg.BaseDirs)
-		assert.Equal(t, []string{}, cfg.SkipPatterns)
+		assert.Empty(t, cfg.SkipPatterns)
+		assert.Empty(t, cfg.OpaquePatterns)
+		assert.Empty(t, cfg.PreservePatterns)
 		assert.Zero(t, cfg.Verbosity)
 		require.True(t, cfg.UseGitIgnore)
 		require.False(t, cfg.IncludeDot)

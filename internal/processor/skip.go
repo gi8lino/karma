@@ -6,21 +6,19 @@ import (
 	"strings"
 )
 
-// SkipMode enumerates how patterns should behave.
+// skipMode describes how a matching directory should be handled.
 type skipMode int
 
 const (
-	skipModeExact skipMode = iota
-	skipModeGlob
-	skipModeSubtree
-	skipModeChildren
+	skipModeDrop skipMode = iota
+	skipModeOpaque
+	skipModePreserve
 )
 
-// skipRule represents a parsed skip pattern.
+// skipRule combines a path pattern with its directory behavior.
 type skipRule struct {
-	raw   string
-	mode  skipMode
-	value string
+	pattern string
+	mode    skipMode
 }
 
 // childDir carries metadata that controls how we recurse into a directory.
@@ -30,110 +28,66 @@ type childDir struct {
 	skipWalk   bool   // True when recursion into the directory should be skipped.
 }
 
-// parseSkipRules compiles CLI patterns into skipRule entries.
-func parseSkipRules(patterns []string) []skipRule {
-	rules := make([]skipRule, 0, len(patterns))
-	for _, raw := range patterns {
-		rule := skipRule{raw: raw}
-		canonical := strings.TrimRight(raw, "/")
-		switch {
-		case strings.HasSuffix(canonical, "/**"):
-			// Keep directories but skip their own kustomization.
-			rule.mode = skipModeSubtree
-			rule.value = strings.TrimSuffix(canonical, "/**")
-		case strings.HasSuffix(raw, "/*"):
-			// Skip immediate children but keep the parent listed.
-			rule.mode = skipModeChildren
-			rule.value = strings.TrimSuffix(canonical, "/*")
-		case strings.ContainsAny(raw, "*?[]"):
-			// Treat glob patterns as direct skip rules.
-			rule.mode = skipModeGlob
-			rule.value = raw
-		default:
-			// Plain literal directories or files.
-			rule.mode = skipModeExact
-			rule.value = strings.TrimSuffix(raw, "/")
-		}
-		rules = append(rules, rule)
+// parseSkipRules builds rules from the three explicit CLI behaviors. Rules are
+// checked in this order, so skip wins over opaque, which wins over preserve.
+func parseSkipRules(skip, opaque, preserve []string) []skipRule {
+	rules := make([]skipRule, 0, len(skip)+len(opaque)+len(preserve))
+	for _, pattern := range skip {
+		rules = append(rules, skipRule{pattern: cleanSkipPattern(pattern), mode: skipModeDrop})
+	}
+	for _, pattern := range opaque {
+		rules = append(rules, skipRule{pattern: cleanSkipPattern(pattern), mode: skipModeOpaque})
+	}
+	for _, pattern := range preserve {
+		rules = append(rules, skipRule{pattern: cleanSkipPattern(pattern), mode: skipModePreserve})
 	}
 	return rules
 }
 
-// matchSkip determines whether rel matches any configured skip rule.
-func matchSkip(rel string, isDir bool, rules []skipRule) (skip bool, mode skipMode, pattern string) {
-	for _, rule := range rules {
-		switch rule.mode {
-		case skipModeSubtree:
-			// Subtree skips only affect the directory itself, so children can still be processed.
-			if rel == rule.value {
-				return true, skipModeSubtree, rule.raw
-			}
-		case skipModeChildren:
-			// Children skips only apply to immediate descendants.
-			if isDir && rel == rule.value {
-				return true, skipModeChildren, rule.raw
-			}
-			if matchesChild(rel, rule.value) {
-				return true, skipModeChildren, rule.raw
-			}
-		case skipModeExact:
-			// Exact matches drop the resource entirely.
-			if rel == rule.value {
-				return true, skipModeExact, rule.raw
-			}
-
-			// Match by basename in case the pattern is relative.
-			if !strings.Contains(rule.value, "/") && path.Base(rel) == rule.value {
-				return true, skipModeExact, rule.raw
-			}
-		case skipModeGlob:
-			// Glob patterns work across the full path.
-			if matched, err := path.Match(rule.value, rel); err == nil && matched {
-				return true, skipModeGlob, rule.raw
-			}
-
-			// Also allow glob matches against the basename for non-path patterns.
-			if !strings.Contains(rule.value, "/") {
-				if matched, err := path.Match(rule.value, path.Base(rel)); err == nil && matched {
-					return true, skipModeGlob, rule.raw
-				}
-			}
-		}
-	}
-	return false, skipModeExact, ""
+func cleanSkipPattern(pattern string) string {
+	return strings.Trim(strings.TrimSpace(pattern), "/")
 }
 
-// handleSkipDir records how a skipped directory should adjust the resource lists.
+// matchSkip determines whether rel matches a configured rule. Opaque and
+// preserve apply only to directories; files continue through normal scanning.
+func matchSkip(rel string, isDir bool, rules []skipRule) (skip bool, mode skipMode, pattern string) {
+	for _, rule := range rules {
+		if rule.pattern == "" || (!isDir && rule.mode != skipModeDrop) {
+			continue
+		}
+		if matchesSkipPattern(rel, rule.pattern) {
+			return true, rule.mode, rule.pattern
+		}
+	}
+	return false, skipModeDrop, ""
+}
+
+// matchesSkipPattern matches patterns containing a slash against the path from
+// the processing root. Patterns without a slash match basenames at any depth.
+func matchesSkipPattern(rel, pattern string) bool {
+	if strings.Contains(pattern, "/") {
+		matched, err := path.Match(pattern, rel)
+		return err == nil && matched
+	}
+	matched, err := path.Match(pattern, path.Base(rel))
+	return err == nil && matched
+}
+
+// handleSkipDir records how a matched directory should adjust traversal.
 func handleSkipDir(entry os.DirEntry, mode skipMode, dirEntries []string, childDirs []childDir) ([]string, []childDir) {
 	name := entry.Name()
 	switch mode {
-	case skipModeExact:
-		// Exact skips drop the directory from the resource list.
+	case skipModeDrop:
 		return dirEntries, childDirs
-	case skipModeChildren:
-		// Keep directories listed but skip their contents.
+	case skipModeOpaque:
 		dirEntries = append(dirEntries, name)
 		childDirs = append(childDirs, childDir{name: name, skipWalk: true})
 		return dirEntries, childDirs
-	case skipModeSubtree:
-		// Keep the directory listed but never rewrite its kustomization.
+	case skipModePreserve:
 		dirEntries = append(dirEntries, name)
 		childDirs = append(childDirs, childDir{name: name, skipUpdate: true})
 		return dirEntries, childDirs
 	default:
-		// Fallback for unknown modes, keep the current lists unchanged.
 		return dirEntries, childDirs
 	}
-}
-
-// matchesChild reports whether rel is a direct child of prefix.
-func matchesChild(rel, prefix string) bool {
-	if prefix == "" {
-		return !strings.Contains(rel, "/")
-	}
-	if !strings.HasPrefix(rel, prefix+"/") {
-		return false
-	}
-	rest := rel[len(prefix)+1:]
-	return rest != "" && !strings.Contains(rest, "/")
 }

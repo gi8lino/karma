@@ -20,6 +20,8 @@ import (
 type Options struct {
 	ResourceOrder []string
 	Skip          []string
+	Opaque        []string
+	Preserve      []string
 	UseGitIgnore  bool
 	IncludeDot    bool
 	AddDirSuffix  bool
@@ -57,7 +59,7 @@ func New(opts Options, logger *logging.Logger) *Processor {
 	return &Processor{
 		opts:      opts,
 		logger:    logger,
-		skipRules: parseSkipRules(opts.Skip),
+		skipRules: parseSkipRules(opts.Skip, opts.Opaque, opts.Preserve),
 	}
 }
 
