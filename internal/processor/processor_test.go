@@ -66,6 +66,40 @@ func TestProcessorProcess(t *testing.T) {
 		assert.NotContains(t, string(data), "resources:")
 	})
 
+	t.Run("does not add yaml referenced by other kustomization fields", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		kustom := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(kustom, []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - app.yaml
+  - patch.yaml
+patches:
+  - path: patch.yaml
+configurations:
+  - kustomizeconfig.yaml
+helmCharts:
+  - name: demo
+    valuesFile: values.yaml
+`), 0o644))
+		for _, name := range []string{"app.yaml", "patch.yaml", "kustomizeconfig.yaml", "values.yaml"} {
+			require.NoError(t, os.WriteFile(filepath.Join(temp, name), []byte("kind: ConfigMap\n"), 0o644))
+		}
+
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		_, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(kustom)
+		require.NoError(t, err)
+		var doc struct {
+			Resources []string `yaml:"resources"`
+		}
+		require.NoError(t, yaml.Unmarshal(data, &doc))
+		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
+	})
+
 	t.Run("does not use arbitrary yaml by kind", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()

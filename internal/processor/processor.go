@@ -129,6 +129,11 @@ func (p *Processor) scanEntries(
 	matcher gitignore.Matcher,
 	kustomizationPath string,
 ) (dirEntries []string, fileEntries []string, childDirs []childDir, err error) {
+	referenced, err := referencedYAMLFiles(kustomizationPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Get all items in the directory.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -177,6 +182,10 @@ func (p *Processor) scanEntries(
 
 		// Include eligible YAML files in the resource list.
 		if isYAML(entry.Name()) {
+			if _, usedElsewhere := referenced[entry.Name()]; usedElsewhere {
+				p.logger.Skipped("path", rel, "reason", "referenced")
+				continue
+			}
 			fileEntries = append(fileEntries, entry.Name())
 		}
 	}
