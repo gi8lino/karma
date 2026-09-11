@@ -137,6 +137,62 @@ resources:
 		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
 	})
 
+	t.Run("does not add component directory to resources", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		component := filepath.Join(temp, "component")
+		require.NoError(t, os.Mkdir(component, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(component, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		kustom := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(kustom, []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+components:
+  - component
+resources:
+  - app.yaml
+`), 0o644))
+
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		_, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(kustom)
+		require.NoError(t, err)
+		var doc struct {
+			Resources []string `yaml:"resources"`
+		}
+		require.NoError(t, yaml.Unmarshal(data, &doc))
+		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
+	})
+
+	t.Run("does not treat arbitrary yaml-looking values as references", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		kustom := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(kustom, []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonAnnotations:
+  config: app.yaml
+resources: []
+`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		_, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(kustom)
+		require.NoError(t, err)
+		var doc struct {
+			Resources []string `yaml:"resources"`
+		}
+		require.NoError(t, yaml.Unmarshal(data, &doc))
+		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
+	})
+
 	t.Run("does not use arbitrary yaml by kind", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()

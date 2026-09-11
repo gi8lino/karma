@@ -129,7 +129,7 @@ func (p *Processor) scanEntries(
 	matcher gitignore.Matcher,
 	kustomizationPath string,
 ) (dirEntries []string, fileEntries []string, childDirs []childDir, err error) {
-	referenced, err := referencedYAMLFiles(kustomizationPath)
+	referenced, err := referencedLocalEntries(kustomizationPath)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -177,9 +177,15 @@ func (p *Processor) scanEntries(
 			continue
 		}
 
-		// Record directories and schedule recursive processing.
+		// Record directories and schedule recursive processing. A directory explicitly
+		// referenced by another Kustomization field (for example components) is still
+		// traversed, but is not also injected into resources.
 		if entry.IsDir() {
-			dirEntries = append(dirEntries, entry.Name())
+			if _, usedElsewhere := referenced[entry.Name()]; !usedElsewhere {
+				dirEntries = append(dirEntries, entry.Name())
+			} else {
+				p.logger.Skipped("path", rel, "reason", "referenced")
+			}
 			childDirs = append(childDirs, childDir{name: entry.Name()})
 			continue
 		}
