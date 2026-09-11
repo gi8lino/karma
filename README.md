@@ -1,6 +1,6 @@
 # karma - Kustomization Resource Management Assistant
 
-karma keeps nested `kustomization.yaml` files in sync with the directory tree while preserving comments, respecting `.gitignore`, and honoring user-provided skip rules.
+karma keeps canonical Kustomization files (`kustomization.yaml`, `kustomization.yml`, or `Kustomization`) in sync with the directory tree while preserving comments, respecting `.gitignore`, and honoring user-provided skip rules.
 
 ## Usage
 
@@ -36,7 +36,7 @@ karma [options] <base-dir>...
 
 - Writes only the `resources` block, preserving other fields and comments.
 - Preserves external resource references such as remote URLs and non-direct local paths, supports optional directory suffixing, alphabetical ordering, and explicit `skip`, `opaque`, and `preserve` patterns.
-- Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
+- Reads nested `.gitignore` files to allow fine-grained exclusions.
 - Plans and updates per base directory, reporting a final summary.
 - Supports non-mutating `--dry-run` previews and CI-friendly `--check` validation.
 

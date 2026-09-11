@@ -33,7 +33,6 @@ type LogLevel int
 
 const (
 	LevelOff LogLevel = iota
-	LevelError
 	LevelInfo
 	LevelVerbose
 	LevelDebug
@@ -60,21 +59,16 @@ func LevelFromVerbosity(v int) LogLevel {
 // Logger formats CLI output with output streams and a minimum log level.
 type Logger struct {
 	out      io.Writer
-	err      io.Writer
 	minLevel LogLevel
 }
 
-// New creates a logger that renders on the provided writers.
-func New(out, err io.Writer, level LogLevel) *Logger {
+// New creates a logger that renders on the provided writer.
+func New(out io.Writer, level LogLevel) *Logger {
 	return &Logger{
 		out:      out,
-		err:      err,
 		minLevel: level,
 	}
 }
-
-// Flush exists for symmetry with buffered I/O.
-func (l *Logger) Flush() {}
 
 // Processing logs the current directory when the console level allows it.
 func (l *Logger) Processing(kind string, kv ...string) {
@@ -104,13 +98,6 @@ func (l *Logger) NoOp(path string, kv ...string) {
 	})
 }
 
-// Debug logs debug-level output when the log level permits.
-func (l *Logger) Debug(msg string, kv ...string) {
-	l.log(l.out, LevelDebug, "DEBUG", func() []string {
-		return append([]string{"message", msg}, kv...)
-	})
-}
-
 // DebugKV logs debug-level key/value pairs without a message prefix.
 func (l *Logger) DebugKV(kv ...string) {
 	l.log(l.out, LevelDebug, "DEBUG", func() []string {
@@ -136,13 +123,6 @@ func (l *Logger) Summary(updated, noOp, reordered, added, removed int) {
 			"removed", fmt.Sprintf("%d", removed),
 		}
 		return kv
-	})
-}
-
-// Error logs an error to stderr regardless of verbosity.
-func (l *Logger) Error(msg string, kv ...string) {
-	l.log(l.err, LevelError, "ERROR", func() []string {
-		return append([]string{"message", msg}, kv...)
 	})
 }
 

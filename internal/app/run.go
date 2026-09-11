@@ -17,7 +17,7 @@ import (
 var ErrCheckFailed = errors.New("kustomizations are not in sync")
 
 // Run wires parsing, logging, and processing to execute the command.
-func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.Writer) error {
+func Run(ctx context.Context, version string, args []string, stdOut io.Writer) error {
 	// Parse the CLI flags.
 	cfg, err := cli.Parse(version, args)
 	if err != nil {
@@ -30,7 +30,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 
 	// Set up the logger.
 	logLevel := logging.LevelFromVerbosity(cfg.Verbosity)
-	logger := logging.New(stdOut, stdErr, logLevel)
+	logger := logging.New(stdOut, logLevel)
 
 	// Log the version and configuration.
 	logger.DebugKV("version", version)
@@ -60,11 +60,11 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 		ResourceOrder: cfg.ResourceOrder,
 	}
 
-	// Process each base directory.
+	// Process each base directory with the same immutable processor configuration.
+	proc := processor.New(opts, logger)
 	var totalStats processor.ResourceStats
 	for _, dir := range cfg.BaseDirs {
 		logger.Processing("base", "path", dir)
-		proc := processor.New(opts, logger)
 		stats, err := proc.Process(ctx, dir)
 		if err != nil {
 			return err

@@ -20,7 +20,7 @@ func TestProcessorProcess(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		_, err := proc.Process(ctx, t.TempDir())
 		require.ErrorIs(t, err, context.Canceled)
@@ -30,7 +30,7 @@ func TestProcessorProcess(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestProcessorProcess(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		_, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestProcessorProcess(t *testing.T) {
 		kustom := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(kustom, []byte("kind: Component\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ helmCharts:
 			require.NoError(t, os.WriteFile(filepath.Join(temp, name), []byte("kind: ConfigMap\n"), 0o644))
 		}
 
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 		_, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
 
@@ -121,7 +121,7 @@ resources:
   - app.yaml
 `), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
@@ -155,7 +155,7 @@ resources:
   - app.yaml
 `), 0o644))
 
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 		_, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
 
@@ -180,7 +180,7 @@ resources: []
 `), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 		_, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
 
@@ -199,7 +199,7 @@ resources: []
 		custom := filepath.Join(temp, "custom.yaml")
 		require.NoError(t, os.WriteFile(custom, []byte("kind: Kustomization\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		stats, err := proc.Process(context.Background(), temp)
 		require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestScanEntries(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(temp, "skipdir"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "normal.yaml"), []byte("x: 1\n"), 0o644))
 
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(Options{
 			Opaque:     []string{"skipdir"},
 			IncludeDot: false,
@@ -270,7 +270,7 @@ func TestProcessorRelPath(t *testing.T) {
 
 	t.Run("returns basename for root", func(t *testing.T) {
 		t.Parallel()
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 		temp := t.TempDir()
 		path := filepath.Join(temp, "foo")
 		rel := proc.relPath(temp, path)
@@ -279,7 +279,7 @@ func TestProcessorRelPath(t *testing.T) {
 
 	t.Run("converts to slash", func(t *testing.T) {
 		t.Parallel()
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 		base := filepath.Join(t.TempDir(), "base")
 		full := filepath.Join(base, "nested", "file")
 		rel := proc.relPath(base, full)
@@ -296,7 +296,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 			temp := t.TempDir()
 			path := filepath.Join(temp, name)
 			require.NoError(t, os.WriteFile(path, []byte("kind: Kustomization\n"), 0o644))
-			proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+			proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 			got, exists, err := proc.pickKustomizationPath(temp)
 			require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "kustomization.yaml"), []byte("kind: Kustomization\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "Kustomization"), []byte("kind: Kustomization\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		_, _, err := proc.pickKustomizationPath(temp)
 		require.Error(t, err)
@@ -321,7 +321,7 @@ func TestProcessorPickKustomizationPath(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "custom.yaml"), []byte("kind: Kustomization\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		got, exists, err := proc.pickKustomizationPath(temp)
 		require.NoError(t, err)
@@ -343,7 +343,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 			AddDirSuffix:  true,
 			ResourceOrder: []string{"external", "dirs"},
 		}
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
 		updated, order, final, stats, err := proc.updateKustomization(path, true, []string{"added"}, []string{"alpha.yaml"})
 		require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("resources:\n  - app.yaml\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		updated, _, _, _, err := proc.updateKustomization(path, true, nil, []string{"app.yaml"})
 		require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		updated, _, _, _, err := proc.updateKustomization(path, false, nil, nil)
 		require.NoError(t, err)
@@ -399,7 +399,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		proc := New(Options{DryRun: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{DryRun: true}, logging.New(io.Discard, logging.LevelInfo))
 
 		updated, _, final, _, err := proc.updateKustomization(path, false, nil, []string{"app.yaml"})
 		require.NoError(t, err)
@@ -414,7 +414,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - exist\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
 		_, _, _, _, err := proc.updateKustomization(path, true, []string{"exist"}, nil)
@@ -436,7 +436,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 
 	t.Run("respects skip update", func(t *testing.T) {
 		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 		stats, err := proc.applyKustomization("", "", true, nil, nil, true)
 		require.NoError(t, err)
@@ -449,7 +449,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		opts := Options{AddDirPrefix: true, ResourceOrder: []string{"external", "dirs"}}
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
 
 		stats, err := proc.applyKustomization(temp, path, false, []string{"dir"}, []string{"file.yaml"}, false)
@@ -467,7 +467,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("---\nresources:\n  - kept\n"), 0o644))
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
 		root, seq, order, nodes, _, err := proc.loadKustomization(path, true)
@@ -483,7 +483,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("- one\n- two\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		_, _, _, _, _, err := proc.loadKustomization(path, true)
 		require.Error(t, err)
@@ -495,7 +495,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("resources: app.yaml\n"), 0o644))
-		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
 		_, _, _, _, _, err := proc.loadKustomization(path, true)
 		require.Error(t, err)
@@ -506,7 +506,7 @@ func TestProcessorLoadKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(Options{}, logger)
 
 		root, seq, order, nodes, _, err := proc.loadKustomization(path, false)
@@ -585,7 +585,7 @@ func TestCollectExistingResources(t *testing.T) {
 func TestMergeResourcesPreservesUnmanagedReferences(t *testing.T) {
 	t.Parallel()
 
-	proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+	proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 	final := proc.mergeResources(
 		[]string{"../base", "nested/shared", "https://example.com/base", "removed.yaml"},
 		nil,
@@ -609,7 +609,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 			AddDirSuffix:  true,
 			ResourceOrder: []string{"external", "dirs"},
 		}
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
 		final := proc.mergeResources([]string{"https://example.com"}, []string{"b", "a"}, []string{"z", "y"})
 		require.Equal(t, []string{"https://example.com", "./a/", "./b/", "y", "z"}, final)
@@ -622,7 +622,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 			AddDirSuffix:  true,
 			ResourceOrder: []string{"external", "files", "dirs"},
 		}
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
 		final := proc.mergeResources([]string{"https://example.com", "https://stable.com"}, []string{"b", "a"}, []string{"x"})
 		require.Equal(t, []string{"https://example.com", "https://stable.com", "x", "./a/", "./b/"}, final)
@@ -634,7 +634,7 @@ func TestProcessorEnsureDirSuffix(t *testing.T) {
 
 	t.Run("appends slash when enabled", func(t *testing.T) {
 		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		opts := Options{AddDirSuffix: true}
 		proc := New(opts, logger)
 		got := proc.ensureDirSuffix([]string{"app", "config"})
@@ -643,7 +643,7 @@ func TestProcessorEnsureDirSuffix(t *testing.T) {
 
 	t.Run("leaves input when disabled", func(t *testing.T) {
 		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		opts := Options{}
 		proc := New(opts, logger)
 		got := proc.ensureDirSuffix([]string{"app", "config"})
@@ -656,7 +656,7 @@ func TestProcessorEnsureDirPrefix(t *testing.T) {
 
 	t.Run("adds prefix to every directory", func(t *testing.T) {
 		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		opts := Options{AddDirPrefix: true}
 		proc := New(opts, logger)
 		got := proc.ensureDirPrefix([]string{"app", "test", "./already"})
@@ -665,7 +665,7 @@ func TestProcessorEnsureDirPrefix(t *testing.T) {
 
 	t.Run("leaves input when disabled", func(t *testing.T) {
 		t.Parallel()
-		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
+		logger := logging.New(io.Discard, logging.LevelInfo)
 		opts := Options{}
 		proc := New(opts, logger)
 		got := proc.ensureDirPrefix([]string{"app", "test"})

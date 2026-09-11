@@ -16,7 +16,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	if err := app.Run(ctx, Version, os.Args[1:], os.Stdout, os.Stderr); err != nil {
+	if err := app.Run(ctx, Version, os.Args[1:], os.Stdout); err != nil {
 		if !errors.Is(err, app.ErrCheckFailed) {
 			fmt.Fprintln(os.Stderr, err)
 		}

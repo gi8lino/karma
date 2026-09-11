@@ -20,11 +20,10 @@ func TestRun(t *testing.T) {
 		file := filepath.Join(temp, "app.yaml")
 		require.NoError(t, os.WriteFile(file, []byte("kind: ConfigMap\n"), 0o644))
 
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{temp}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{temp}, &out)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "[SUMMARY")
-		assert.Empty(t, errOut.String())
 
 		data, err := os.ReadFile(filepath.Join(temp, "kustomization.yaml"))
 		require.NoError(t, err)
@@ -34,28 +33,26 @@ func TestRun(t *testing.T) {
 
 	t.Run("returns parse error when missing args", func(t *testing.T) {
 		t.Parallel()
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", nil, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", nil, &out)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "positional")
 	})
 
 	t.Run("prints help when requested", func(t *testing.T) {
 		t.Parallel()
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{"--help"}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--help"}, &out)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Usage:")
-		assert.Empty(t, errOut.String())
 	})
 
 	t.Run("prints version when requested", func(t *testing.T) {
 		t.Parallel()
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v9.9.9", []string{"--version"}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v9.9.9", []string{"--version"}, &out)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "v9.9.9")
-		assert.Empty(t, errOut.String())
 	})
 
 	t.Run("skips files matching patterns", func(t *testing.T) {
@@ -64,10 +61,9 @@ func TestRun(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "patch-extra.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{"-s", "patch-*", temp}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"-s", "patch-*", temp}, &out)
 		require.NoError(t, err)
-		assert.Empty(t, errOut.String())
 
 		data, err := os.ReadFile(filepath.Join(temp, "kustomization.yaml"))
 		require.NoError(t, err)
@@ -79,8 +75,8 @@ func TestRun(t *testing.T) {
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{"--dry-run", temp}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--dry-run", temp}, &out)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "updated=1")
 		_, err = os.Stat(filepath.Join(temp, "kustomization.yaml"))
@@ -92,8 +88,8 @@ func TestRun(t *testing.T) {
 		temp := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
 
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out)
 		require.ErrorIs(t, err, ErrCheckFailed)
 		assert.Contains(t, out.String(), "updated=1")
 		_, statErr := os.Stat(filepath.Join(temp, "kustomization.yaml"))
@@ -110,8 +106,8 @@ resources:
   - app.yaml
 `), 0o644))
 
-		var out, errOut bytes.Buffer
-		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out, &errOut)
+		var out bytes.Buffer
+		err := Run(context.Background(), "v1.0.0", []string{"--check", temp}, &out)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "updated=0")
 	})
