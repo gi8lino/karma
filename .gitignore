@@ -1,2 +1,4 @@
 cover.out
-coverage.out
+icoverage.out
+/bin/
+!/bin/.dev-tools.mk
