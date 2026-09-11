@@ -295,21 +295,11 @@ func (p *Processor) updateKustomization(
 		return false, nil, nil, ResourceStats{}, fmt.Errorf("close encoder: %w", err)
 	}
 
-	// Create or truncate the target file before writing the encoded YAML.
-	file, err := os.Create(path)
-	if err != nil {
-		return false, nil, nil, ResourceStats{}, fmt.Errorf("create %s: %w", path, err)
-	}
-	defer file.Close() // nolint:errcheck
-
-	// Always prepend the canonical document start.
-	if _, err := file.WriteString("---\n"); err != nil {
-		return false, nil, nil, ResourceStats{}, fmt.Errorf("write prefix: %w", err)
-	}
-
-	// Write the encoded document after the header.
-	if _, err := file.Write(buf.Bytes()); err != nil {
-		return false, nil, nil, ResourceStats{}, fmt.Errorf("write content: %w", err)
+	payload := make([]byte, 0, len(buf.Bytes())+4)
+	payload = append(payload, "---\n"...)
+	payload = append(payload, buf.Bytes()...)
+	if err := writeFileAtomic(path, payload, 0o644); err != nil {
+		return false, nil, nil, ResourceStats{}, fmt.Errorf("write %s: %w", path, err)
 	}
 
 	return true, order, final, stats, nil
