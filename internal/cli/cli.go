@@ -14,7 +14,7 @@ type Config struct {
 	BaseDirs      []string
 	SkipPatterns  []string
 	Verbosity     int
-	GitIgnore     bool
+	UseGitIgnore  bool
 	IncludeDot    bool
 	Mute          bool
 	AddDirSuffix  bool
@@ -37,7 +37,8 @@ func Parse(version string, args []string) (Config, error) {
 		Short("s").
 		Value()
 
-	fs.BoolVar(&cfg.GitIgnore, "no-gitignore", false, "Disable .gitignore processing.").
+	var noGitIgnore bool
+	fs.BoolVar(&noGitIgnore, "no-gitignore", false, "Disable .gitignore processing.").
 		Short("g").
 		OneOfGroup("gitignore").
 		Value()
@@ -95,6 +96,7 @@ func Parse(version string, args []string) (Config, error) {
 	}
 
 	cfg.BaseDirs = fs.Args()
+	cfg.UseGitIgnore = !noGitIgnore
 	cfg.ResourceOrder = processor.ParseResourceOrder(*order)
 
 	return cfg, nil

@@ -32,7 +32,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 	logger.DebugKV("version", version)
 	logger.DebugKV(
 		"skip", fmt.Sprintf("%v", cfg.SkipPatterns),
-		"gitignore", fmt.Sprintf("%v", cfg.GitIgnore),
+		"gitignore", fmt.Sprintf("%v", cfg.UseGitIgnore),
 		"include-dot", fmt.Sprintf("%v", cfg.IncludeDot),
 		"dir-suffix", fmt.Sprintf("%v", cfg.AddDirSuffix),
 		"dir-prefix", fmt.Sprintf("%v", cfg.AddDirPrefix),
@@ -42,7 +42,7 @@ func Run(ctx context.Context, version string, args []string, stdOut, stdErr io.W
 	// Create the processor options.
 	opts := processor.Options{
 		Skip:          cfg.SkipPatterns,
-		UseGitIgnore:  cfg.GitIgnore,
+		UseGitIgnore:  cfg.UseGitIgnore,
 		IncludeDot:    cfg.IncludeDot,
 		AddDirSuffix:  cfg.AddDirSuffix,
 		AddDirPrefix:  cfg.AddDirPrefix,

@@ -64,16 +64,15 @@ func New(opts Options, logger *logging.Logger) *Processor {
 
 // Process walks a directory tree and updates kustomizations incrementally.
 func (p *Processor) Process(ctx context.Context, dir string) (ResourceStats, error) {
-	return p.walkDir(ctx, dir, dir, nil, false)
-}
-
-// walkDir processes the current directory and recurses into children.
-func (p *Processor) walkDir(ctx context.Context, dir, base string, parent gitignore.Matcher, skipUpdate bool) (ResourceStats, error) {
-	// Load the matcher once so it can be reused for each directory.
-	matcher, err := p.loadMatcher(dir, parent)
+	matcher, err := gitignore.Load(dir, p.opts.UseGitIgnore)
 	if err != nil {
 		return ResourceStats{}, err
 	}
+	return p.walkDir(ctx, dir, dir, matcher, false)
+}
+
+// walkDir processes the current directory and recurses into children.
+func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitignore.Matcher, skipUpdate bool) (ResourceStats, error) {
 
 	// Resolve which kustomization file should be touched (yaml or yml).
 	kustomizationPath, exists, pathErr := p.pickKustomizationPath(dir)
@@ -183,17 +182,6 @@ func (p *Processor) scanEntries(
 	}
 
 	return dirEntries, fileEntries, childDirs, nil
-}
-
-// loadMatcher returns the matcher for dir using the parent stack.
-func (p *Processor) loadMatcher(dir string, parent gitignore.Matcher) (gitignore.Matcher, error) {
-	if !p.opts.UseGitIgnore {
-		return nil, nil
-	}
-	if parent != nil {
-		return parent.Child(dir)
-	}
-	return gitignore.Load(dir, true)
 }
 
 // relPath computes a clean slash-separated relative path for logging.

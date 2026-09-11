@@ -136,30 +136,6 @@ func TestScanEntries(t *testing.T) {
 	})
 }
 
-func TestProcessorLoadMatcher(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns nil when disabled", func(t *testing.T) {
-		t.Parallel()
-		proc := New(Options{UseGitIgnore: false}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
-		matcher, err := proc.loadMatcher(t.TempDir(), nil)
-		require.NoError(t, err)
-		assert.Nil(t, matcher)
-	})
-
-	t.Run("loads and respects gitignore", func(t *testing.T) {
-		t.Parallel()
-		temp := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(temp, ".gitignore"), []byte("secret.txt\n"), 0o644))
-		proc := New(Options{UseGitIgnore: true}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
-
-		matcher, err := proc.loadMatcher(temp, nil)
-		require.NoError(t, err)
-		require.NotNil(t, matcher)
-		assert.True(t, matcher.Ignored(filepath.Join(temp, "secret.txt"), false))
-	})
-}
-
 func TestProcessorRelPath(t *testing.T) {
 	t.Parallel()
 
