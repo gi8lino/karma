@@ -547,7 +547,9 @@ func ensureHeader(mapNode *yaml.Node) (bool, error) {
 	return false, nil
 }
 
-// collectExistingResources indexes scalar resource entries.
+// collectExistingResources indexes scalar resource entries while preserving
+// the original sequence for change detection. Keeping duplicates in order means
+// the canonical merge can remove them instead of mistaking the file for a no-op.
 func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, order []string, err error) {
 	nodes = make(map[string]*yaml.Node, len(seq.Content))
 	order = make([]string, 0, len(seq.Content))
@@ -556,10 +558,10 @@ func collectExistingResources(seq *yaml.Node) (nodes map[string]*yaml.Node, orde
 		if node.Kind != yaml.ScalarNode {
 			return nil, nil, fmt.Errorf("resources entries must be scalar strings")
 		}
+		order = append(order, node.Value)
 		if _, exists := nodes[node.Value]; !exists {
-			order = append(order, node.Value)
+			nodes[node.Value] = node
 		}
-		nodes[node.Value] = node
 	}
 	return nodes, order, nil
 }

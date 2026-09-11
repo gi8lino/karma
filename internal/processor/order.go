@@ -37,6 +37,7 @@ func normalizeResourceOrder(parts []string) []string {
 	}
 
 	out := make([]string, 0, len(defaultResourceOrder))
+	seen := make(map[string]struct{}, len(defaultResourceOrder))
 
 	// Parse the provided value and add each group.
 	for _, part := range parts {

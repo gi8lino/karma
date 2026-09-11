@@ -110,6 +110,33 @@ helmCharts:
 		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
 	})
 
+	t.Run("removes duplicate resource entries", func(t *testing.T) {
+		t.Parallel()
+		temp := t.TempDir()
+		path := filepath.Join(temp, "kustomization.yaml")
+		require.NoError(t, os.WriteFile(path, []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - app.yaml
+  - app.yaml
+`), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(temp, "app.yaml"), []byte("kind: ConfigMap\n"), 0o644))
+		proc := New(Options{}, logging.New(io.Discard, io.Discard, logging.LevelInfo))
+
+		stats, err := proc.Process(context.Background(), temp)
+		require.NoError(t, err)
+		assert.Equal(t, 1, stats.Updated)
+		assert.Equal(t, 1, stats.Removed)
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		var doc struct {
+			Resources []string `yaml:"resources"`
+		}
+		require.NoError(t, yaml.Unmarshal(data, &doc))
+		assert.Equal(t, []string{"app.yaml"}, doc.Resources)
+	})
+
 	t.Run("does not use arbitrary yaml by kind", func(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
@@ -461,7 +488,7 @@ func TestEnsureResourcesSeq(t *testing.T) {
 func TestCollectExistingResources(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexes scalar nodes", func(t *testing.T) {
+	t.Run("indexes scalar nodes and preserves duplicates", func(t *testing.T) {
 		t.Parallel()
 		seq := &yaml.Node{
 			Kind: yaml.SequenceNode,
@@ -473,9 +500,7 @@ func TestCollectExistingResources(t *testing.T) {
 		}
 		nodes, order, err := collectExistingResources(seq)
 		require.NoError(t, err)
-		require.Len(t, order, 2)
-		assert.Equal(t, "one", order[0])
-		assert.Equal(t, "two", order[1])
+		assert.Equal(t, []string{"one", "two", "one"}, order)
 		assert.Len(t, nodes, 2)
 	})
 
