@@ -580,24 +580,24 @@ func (p *Processor) mergeResources(existing []string, dirEntries, fileEntries []
 	slices.Sort(files)
 	files = slices.Compact(files)
 
-	// Preserve entries Karma cannot positively identify as direct, locally managed
+	// Preserve external entries Karma cannot positively identify as direct, locally managed
 	// resources. This keeps references such as ../base and remote URLs intact.
-	unmanaged := make([]string, 0, len(existing))
+	external := make([]string, 0, len(existing))
 	for _, value := range existing {
 		if !isManagedLocalResource(value) {
-			unmanaged = append(unmanaged, value)
+			external = append(external, value)
 		}
 	}
-	slices.Sort(unmanaged)
-	unmanaged = slices.Compact(unmanaged)
+	slices.Sort(external)
+	external = slices.Compact(external)
 
 	order := normalizeResourceOrder(p.opts.ResourceOrder)
 
-	final := make([]string, 0, len(unmanaged)+len(dirs)+len(files))
+	final := make([]string, 0, len(external)+len(dirs)+len(files))
 	for _, group := range order {
 		switch group {
-		case resourceGroupRemote:
-			final = append(final, unmanaged...)
+		case resourceGroupExternal:
+			final = append(final, external...)
 		case resourceGroupDirs:
 			final = append(final, dirs...)
 		case resourceGroupFiles:

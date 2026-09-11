@@ -59,9 +59,9 @@ func TestParse(t *testing.T) {
 
 	t.Run("order flag", func(t *testing.T) {
 		t.Parallel()
-		cfg, err := Parse("1.0.0", []string{"--order", "remote,files,dirs", "foo"})
+		cfg, err := Parse("1.0.0", []string{"--order", "external,files,dirs", "foo"})
 		require.NoError(t, err)
-		require.Equal(t, []string{"remote", "files", "dirs"}, cfg.ResourceOrder)
+		require.Equal(t, []string{"external", "files", "dirs"}, cfg.ResourceOrder)
 	})
 
 	t.Run("missing positional", func(t *testing.T) {
@@ -91,14 +91,14 @@ func TestParse(t *testing.T) {
 		t.Parallel()
 		_, err := Parse("1.0.0", []string{"--order", "foo"})
 		require.Error(t, err)
-		assert.EqualError(t, err, "invalid value for flag --order: invalid resource order item: foo. allowed are: remote, dirs, files.")
+		assert.EqualError(t, err, "invalid value for flag --order: invalid resource order item: foo. allowed are: external, dirs, files.")
 	})
 
 	t.Run("empty order flag", func(t *testing.T) {
 		t.Parallel()
-		cfg, err := Parse("1.0.0", []string{"--order", "files,dirs,,remote", "positional"})
+		cfg, err := Parse("1.0.0", []string{"--order", "files,dirs,,external", "positional"})
 		require.NoError(t, err)
-		assert.Equal(t, []string{"files", "dirs", "remote"}, cfg.ResourceOrder)
+		assert.Equal(t, []string{"files", "dirs", "external"}, cfg.ResourceOrder)
 	})
 	t.Run("dry run", func(t *testing.T) {
 		t.Parallel()

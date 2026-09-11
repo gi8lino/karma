@@ -285,7 +285,7 @@ func TestProcessorUpdateKustomization(t *testing.T) {
 		opts := Options{
 			AddDirPrefix:  true,
 			AddDirSuffix:  true,
-			ResourceOrder: []string{"remote", "dirs"},
+			ResourceOrder: []string{"external", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
@@ -392,7 +392,7 @@ func TestProcessorApplyKustomization(t *testing.T) {
 		t.Parallel()
 		temp := t.TempDir()
 		path := filepath.Join(temp, "kustomization.yaml")
-		opts := Options{AddDirPrefix: true, ResourceOrder: []string{"remote", "dirs"}}
+		opts := Options{AddDirPrefix: true, ResourceOrder: []string{"external", "dirs"}}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
 
@@ -551,7 +551,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 		opts := Options{
 			AddDirPrefix:  true,
 			AddDirSuffix:  true,
-			ResourceOrder: []string{"remote", "dirs"},
+			ResourceOrder: []string{"external", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)
@@ -564,7 +564,7 @@ func TestMergeResourcesOrders(t *testing.T) {
 		opts := Options{
 			AddDirPrefix:  true,
 			AddDirSuffix:  true,
-			ResourceOrder: []string{"remote", "files", "dirs"},
+			ResourceOrder: []string{"external", "files", "dirs"},
 		}
 		logger := logging.New(io.Discard, io.Discard, logging.LevelInfo)
 		proc := New(opts, logger)

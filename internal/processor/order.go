@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	resourceGroupRemote = "remote"
-	resourceGroupDirs   = "dirs"
-	resourceGroupFiles  = "files"
+	resourceGroupExternal = "external"
+	resourceGroupDirs     = "dirs"
+	resourceGroupFiles    = "files"
 )
 
 var defaultResourceOrder = []string{
-	resourceGroupRemote,
+	resourceGroupExternal,
 	resourceGroupDirs,
 	resourceGroupFiles,
 }
@@ -46,7 +46,7 @@ func normalizeResourceOrder(parts []string) []string {
 			continue
 		}
 		switch group {
-		case resourceGroupRemote, resourceGroupDirs, resourceGroupFiles:
+		case resourceGroupExternal, resourceGroupDirs, resourceGroupFiles:
 		default:
 			continue
 		}

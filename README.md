@@ -14,7 +14,7 @@ karma [options] <base-dir>...
 - `-v` – Increase verbosity to show resource diffs.
 - `-vv` – Enable verbose mode so `[NO-OP]` and `[SKIPPING]` appear.
 - `--mute`, `-q` – Silence all logging (summary, diffs, and status lines); this flag conflicts with `-v`/`-vv`.
-- `--order` – Customize the ordering of remote, directory, and file groups (default `remote,dirs,files`).
+- `--order` – Customize the ordering of external, directory, and file groups (default `external,dirs,files`).
 - `--no-gitignore`, `-g` – Disable `.gitignore` processing.
 - `--include-dot`, `-i` – Include dotfiles and dot-directories.
 - `--suffix`, `-x` – Append `/` when listing directories.
@@ -32,7 +32,7 @@ karma [options] <base-dir>...
 ## Features
 
 - Writes only the `resources` block, preserving other fields and comments.
-- Preserves remote and non-direct resource references, supports optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
+- Preserves external resource references such as remote URLs and non-direct local paths, supports optional directory suffixing, alphabetical ordering, and fast `skip` patterns.
 - Reads `.gitignore` files from each directory figure to allow fine-grained exclusions.
 - Plans and updates per base directory, reporting a final summary.
 - Supports non-mutating `--dry-run` previews and CI-friendly `--check` validation.
