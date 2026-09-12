@@ -1,6 +1,6 @@
 # Shared GNU Make core for dev-tools.
 # Upstream: https://github.com/gi8lino/dev-tools
-# Version: v0.7.0
+# Version: 0.7.0
 
 DEV_TOOLS_ROOT := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
 DEV_TOOLS_CACHE := $(if $(strip $(DEV_TOOLS_VERSION)),$(DEV_TOOLS_ROOT)/.dev-tools/$(DEV_TOOLS_VERSION))

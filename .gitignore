@@ -2,3 +2,8 @@ cover.out
 icoverage.out
 /bin/
 !/bin/.dev-tools.mk
+
+# Keep the dev-tools bootstrap; ignore downloaded release assets.
+/bin/*
+!/bin/
+!/bin/dev-tools.mk
