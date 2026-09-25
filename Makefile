@@ -12,7 +12,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION ?= v2.13.2
+GOLANGCI_LINT_VERSION ?= v2.14.0
 
 # Default tag prefix. Override with VERSION_PREFIX= if you do not want one.
 VERSION_PREFIX ?= v
