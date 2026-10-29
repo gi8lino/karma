@@ -22,8 +22,10 @@ func TestProcessorProcess(t *testing.T) {
 		cancel()
 		proc := New(Options{}, logging.New(io.Discard, logging.LevelInfo))
 
-		_, err := proc.Process(ctx, t.TempDir())
+		dir := t.TempDir()
+		_, err := proc.Process(ctx, dir)
 		require.ErrorIs(t, err, context.Canceled)
+		assert.NoFileExists(t, filepath.Join(dir, "kustomization.yaml"))
 	})
 
 	t.Run("creates missing kustomization", func(t *testing.T) {
