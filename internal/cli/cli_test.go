@@ -100,7 +100,7 @@ func TestParse(t *testing.T) {
 		t.Parallel()
 		_, err := Parse("1.0.0", []string{"--order", "foo"})
 		require.Error(t, err)
-		assert.EqualError(t, err, "invalid value for flag --order: invalid resource order item: foo. allowed are: external, dirs, files.")
+		assert.EqualError(t, err, "invalid value for flag --order: invalid resource order item: foo. allowed are: external, dirs, files")
 	})
 
 	t.Run("empty order flag", func(t *testing.T) {

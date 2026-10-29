@@ -66,6 +66,9 @@ func New(opts Options, logger *logging.Logger) *Processor {
 
 // Process walks a directory tree and updates kustomizations incrementally.
 func (p *Processor) Process(ctx context.Context, dir string) (ResourceStats, error) {
+	if err := ctx.Err(); err != nil {
+		return ResourceStats{}, err
+	}
 	matcher, err := gitignore.Load(dir, p.opts.UseGitIgnore)
 	if err != nil {
 		return ResourceStats{}, err
@@ -75,6 +78,9 @@ func (p *Processor) Process(ctx context.Context, dir string) (ResourceStats, err
 
 // walkDir processes the current directory and recurses into children.
 func (p *Processor) walkDir(ctx context.Context, dir, base string, matcher gitignore.Matcher, skipUpdate bool) (ResourceStats, error) {
+	if err := ctx.Err(); err != nil {
+		return ResourceStats{}, err
+	}
 
 	// Resolve which kustomization file should be touched (yaml or yml).
 	kustomizationPath, exists, pathErr := p.pickKustomizationPath(dir)
